@@ -1,0 +1,192 @@
+/* ===============================
+   GLOBAL THEME
+================================= */
+
+:root {
+  --bg: #020617;
+  --panel: #020617;
+  --panel-border: #1e293b;
+  --cyan: #22d3ee;
+  --cyan-soft: #67e8f9;
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --green: #22c55e;
+  --yellow: #eab308;
+  --red: #ef4444;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at center, #020617 0%, #000 100%);
+  color: var(--text);
+  font-family: "JetBrains Mono", monospace;
+  letter-spacing: 0.03em;
+}
+
+
+/* ===============================
+   PANELS
+================================= */
+
+.panel {
+  background: linear-gradient(180deg, #020617, #000);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow:
+    0 0 0 1px rgba(34,211,238,.08),
+    inset 0 0 20px rgba(34,211,238,.03);
+}
+
+.panel-title {
+  color: var(--cyan);
+  font-size: 13px;
+  border-bottom: 1px solid #0f172a;
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+
+/* ===============================
+   HEADER BAR
+================================= */
+
+.header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #000;
+  border: 1px solid var(--panel-border);
+  padding: 10px 18px;
+  border-radius: 12px;
+  box-shadow: 0 0 15px rgba(34,211,238,.05);
+}
+
+.mode {
+  color: var(--cyan);
+}
+
+.armed {
+  color: var(--green);
+}
+
+.disarmed {
+  color: var(--red);
+}
+
+
+/* ===============================
+   GRID LAYOUT
+================================= */
+
+.cockpit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr;
+  gap: 16px;
+  height: calc(100vh - 120px);
+}
+
+@media (max-width: 1200px) {
+  .cockpit-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+}
+
+
+/* ===============================
+   TELEMETRY VALUES
+================================= */
+
+.label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.value {
+  color: var(--cyan-soft);
+  font-weight: bold;
+}
+
+.value-green { color: var(--green); }
+.value-yellow { color: var(--yellow); }
+.value-red { color: var(--red); }
+
+
+/* ===============================
+   STATUS ROWS
+================================= */
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid #020617;
+}
+
+.stat-row:last-child {
+  border-bottom: none;
+}
+
+
+/* ===============================
+   FOOTER STRIP
+================================= */
+
+.footer-strip {
+  margin-top: 12px;
+  padding: 12px 20px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: #000;
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  box-shadow: inset 0 0 12px rgba(34,211,238,.04);
+}
+
+
+/* ===============================
+   CANVAS HUD EFFECT
+================================= */
+
+canvas {
+  border-radius: 50%;
+  box-shadow:
+    0 0 25px rgba(34,211,238,.1),
+    inset 0 0 30px rgba(34,211,238,.08);
+}
+
+
+/* ===============================
+   WARNING STATES
+================================= */
+
+.warning {
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0% { opacity: 1; }
+  50% { opacity: .3; }
+  100% { opacity: 1; }
+}
+
+
+/* ===============================
+   SCROLLBARS (DARK HUD STYLE)
+================================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #0ea5e9;
+  border-radius: 6px;
+}
