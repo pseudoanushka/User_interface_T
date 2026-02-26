@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Optional
 from pymavlink import mavutil
 from threading import Lock
+import datetime
 
 lock = Lock()
 latest_data = {
@@ -91,7 +92,8 @@ def save_message_to_json(msg):
     try:
         file_path = os.path.join(PARAMS_DIR, f"{msg.get_type()}.json")
         with open(file_path, "w") as f:
-            json.dump(msg.to_dict(), f, indent=4)
+            json.dump(msg.to_dict(), f, indent=4)    
+        # print(f"Saved {msg.get_type()}.json at {datetime.datetime.now()}")
     except Exception as e:
         print(f"JSON save error ({msg.get_type()}): {e}")
 
@@ -161,31 +163,35 @@ def main():
             )
             break
         except Exception as e:
-            print(f"Failed to connect to {COM_PORT}: {e}. Retrying in 5s...")
-            time.sleep(5)
+            # print(f"Failed to connect to {COM_PORT}: {e}. Retrying in 5s...")
+            # # time.sleep(5)
+            print(e)
 
-    print("Waiting for heartbeat...")
-    if not master.wait_heartbeat(timeout=30):
-        print("Timeout waiting for heartbeat. Please check hardware connection.")
-        return
-
-    print("Heartbeat OK:", master.target_system, master.target_component)
+    while True:
+        print("Waiting for heartbeat...")
+        if master.wait_heartbeat(timeout=30):
+            print("Heartbeat OK:", master.target_system, master.target_component)
+            break
+        print("Timeout waiting for heartbeat. Please check hardware connection. Retrying...")
 
     # Request telemetry rates
-    request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, 20)
-    request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_LOCAL_POSITION_NED, 20)
-    request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_SYS_STATUS, 2)
-    request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_BATTERY_STATUS, 1)
+    request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_ATTITUDE, 10)
+    request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_LOCAL_POSITION_NED, 5)
+    request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_SYS_STATUS, 5)
+    request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_BATTERY_STATUS, 5)
     # request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_ODOMETRY, 20)
-    request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_OPTICAL_FLOW_RAD, 20)
-    request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_DISTANCE_SENSOR, 20)
+    request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_OPTICAL_FLOW_RAD, 5)
+    request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_DISTANCE_SENSOR, 5)
 
     tel = Tel()
     last_print = 0.0
 
     while True:
-        msg = master.recv_match(blocking=True, timeout=1)
-        if not msg or msg.get_type() == "BAD_DATA":
+        msg = master.recv_match(blocking=False)
+        if(msg is None):
+            continue
+        if msg.get_type() == "BAD_DATA":
+            print("Bad data")
             continue
 
         mtype = msg.get_type()
@@ -193,6 +199,7 @@ def main():
         # Save selected messages to JSON
         if mtype in LOG_MESSAGE_TYPES:
             save_message_to_json(msg)
+            pass
 
         # ---- Message Handlers ----
         if mtype == "HEARTBEAT":
@@ -214,6 +221,7 @@ def main():
             tel.roll_deg = math.degrees(msg.roll)
             tel.pitch_deg = math.degrees(msg.pitch)
             tel.yaw_deg = (math.degrees(msg.yaw) + 360) % 360
+            save_message_to_json(msg)
 
         elif mtype == "LOCAL_POSITION_NED":
             tel.x, tel.y, tel.z = msg.x, msg.y, msg.z
