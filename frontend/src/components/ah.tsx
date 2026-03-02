@@ -107,13 +107,13 @@ export function ArtificialHorizon({ pitch, roll, yaw, children }: ArtificialHori
     ctx.restore();
 
     // Draw fixed aircraft symbol
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = Math.max(2, radius * 0.01);
-    ctx.fillStyle = '#fbbf24';
+    ctx.strokeStyle = '#a30c0cff';
+    ctx.lineWidth = Math.max(2, radius * 0.02);
+    ctx.fillStyle = '#d2c198ff';
 
     // Center dot
     ctx.beginPath();
-    ctx.arc(centerX, centerY, Math.max(2, radius * 0.015), 0, 2 * Math.PI);
+    ctx.arc(centerX, centerY, Math.max(2, radius * 0.02), 0, 2 * Math.PI);
     ctx.fill();
 
     // Wings

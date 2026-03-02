@@ -37,7 +37,7 @@ export const VelocityVectors: React.FC<VelocityVectorsProps> = ({ vx = 0, vy = 0
     const arrowScale = position === 'right' ? 1 + Math.min(vMax * 0.5, 1.5) : 1;
 
     return (
-        <div className={position === 'left' ? "ah-rv-widget" : "ah-vv-box"}>
+        <div className={position === 'left' ? "ah-rv-widget" : "ah-vv-box"} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 
             {/* Simple gauge with only one arrow */}
             <div style={{
@@ -54,7 +54,9 @@ export const VelocityVectors: React.FC<VelocityVectorsProps> = ({ vx = 0, vy = 0
                 backdropFilter: 'blur(4px)'
             }}>
                 {/* Crosshairs */}
-                <div style={{ position: 'absolute', width: '1px', height: '100%', background: 'rgba(100, 116, 139, 0.4)' }} />
+                {position !== 'left' && (
+                    <div style={{ position: 'absolute', width: '1px', height: '100%', background: 'rgba(100, 116, 139, 0.4)' }} />
+                )}
                 <div style={{ position: 'absolute', width: '100%', height: '1px', background: 'rgba(100, 116, 139, 0.4)' }} />
 
                 {/* Center dot */}
@@ -91,6 +93,17 @@ export const VelocityVectors: React.FC<VelocityVectorsProps> = ({ vx = 0, vy = 0
                         <path d="M3 21l6-9-6-9 18 9-18 9z" />
                     </svg>
                 </div>
+            </div>
+
+            {/* External Gauge Label */}
+            <div style={{
+                marginTop: '12px',
+                color: '#22d3ee',
+                fontSize: '1.2rem',
+                fontWeight: 'bold',
+                textShadow: '0 0 8px rgba(34,211,238,0.8)'
+            }}>
+                {position === 'left' ? 'Vv' : 'Vh'}
             </div>
         </div>
     );
