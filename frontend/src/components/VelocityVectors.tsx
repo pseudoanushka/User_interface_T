@@ -45,12 +45,13 @@ export const VelocityVectors: React.FC<VelocityVectorsProps> = ({ vx = 0, vy = 0
                 width: '200px',
                 height: '200px',
                 borderRadius: '50%',
-                border: '1px dashed rgba(34,211,238,0.4)',
-                boxShadow: 'inset 0 0 10px rgba(34,211,238,0.1), 0 0 10px rgba(34,211,238,0.1)',
+                border: '2px dashed rgba(34,211,238,0.8)',
+                boxShadow: 'inset 0 0 20px rgba(34,211,238,0.3), 0 0 15px rgba(34,211,238,0.2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: 'transparent'
+                backgroundColor: 'rgba(2,6,23,0.5)',
+                backdropFilter: 'blur(4px)'
             }}>
                 {/* Crosshairs */}
                 <div style={{ position: 'absolute', width: '1px', height: '100%', background: 'rgba(100, 116, 139, 0.4)' }} />

@@ -12,9 +12,9 @@ export const Compass: React.FC<CompassProps> = ({ heading }) => {
                 style={{
                     width: '200px',
                     height: '200px',
-                    background: 'transparent',
-                    boxShadow: 'inset 0 0 15px rgba(34,211,238,0.1), 0 0 0 1px rgba(34,211,238,0.3)',
-                    backdropFilter: 'blur(4px)'
+                    background: 'rgba(2,6,23,0.5)',
+                    boxShadow: 'inset 0 0 20px rgba(34,211,238,0.3), 0 0 0 2px rgba(34,211,238,0.6), 0 0 15px rgba(34,211,238,0.2)',
+                    backdropFilter: 'blur(6px)'
                 }}>
 
                 {/* N and S Markets */}
@@ -29,7 +29,7 @@ export const Compass: React.FC<CompassProps> = ({ heading }) => {
                 </div>
 
                 {/* Inner Ring */}
-                <div className="absolute w-[65%] h-[65%] border border-[rgba(34,211,238,0.3)] rounded-full opacity-80 backdrop-blur-md"></div>
+                <div className="absolute w-[65%] h-[65%] border-2 border-[rgba(34,211,238,0.6)] rounded-full opacity-100 backdrop-blur-md"></div>
 
                 {/* Double Needle rotating with heading */}
                 <div
