@@ -1,11 +1,14 @@
 import { TelemetryPanel } from "./t_panel";
 import { ArtificialHorizon } from "./ah";
+import { Compass } from "./Compass";
+import { BatteryIndicator } from "./BatteryIndicator";
+import { VelocityVectors } from "./VelocityVectors";
 
 interface TelemetryData {
   position: { x: number; y: number; z: number };
   velocity: { vx: number; vy: number; vz: number };
   attitude: { pitch: number; roll: number; yaw: number };
-  battery: number;
+  battery: { percent: number; voltage: number; current: number } | number;
   temperature: number;
   linkQuality: number;
   storage: number;
@@ -16,41 +19,41 @@ interface TelemetryData {
 
 export default function CockpitDashboard({ data }: { data: TelemetryData }) {
   return (
-    <div style={{ width: '640px', height: '550px', overflow: 'hidden', backgroundColor: '#020617', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      {/* Intelligently scaled wrapper: retains natural component styling while avoiding scrollbars */}
-      <div style={{
-        width: '800px',
-        height: '1000px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '26px',
-        padding: '16px',
-        transform: 'scale(0.35)', /* 1000px height * 0.35 = 350px (fits nicely into 360px) */
-        transformOrigin: 'center center'
-      }}>
-
-        {/* TOP: PRIMARY FLIGHT DISPLAY (Artificial Horizon) */}
-        <div>
+    <div className="cockpit-container">
+      <div className="cockpit-grid">
+        <div className="attitude-container">
           <ArtificialHorizon
             pitch={data.attitude.pitch}
             roll={data.attitude.roll}
             yaw={data.attitude.yaw}
-            vx={data.velocity.vx}
-            vy={data.velocity.vy}
-            vz={data.velocity.vz}
-            batteryPercent={typeof data.battery === 'number' ? data.battery : (data.battery as any)?.percent}
-            batteryV={(data.battery as any)?.voltage}
-            batteryA={(data.battery as any)?.current}
-            mode={data.mode}
-            armed={data.armed}
-          />
-        </div>
+          >
+            {/* Embedded Widgets for Four-Corner Layout */}
+            <div className="widget-corner top-left">
+              <Compass heading={data.attitude.yaw} />
+            </div>
 
-        {/* BOTTOM: TELEMETRY PANEL */}
-        <div className="panel">
-          <TelemetryPanel data={data} />
-        </div>
+            <div className="widget-corner top-right">
+              <BatteryIndicator
+                batteryPercent={typeof data.battery === 'number' ? data.battery : (data.battery as { percent?: number })?.percent}
+                batteryV={(data.battery as { voltage?: number })?.voltage}
+                batteryA={(data.battery as { current?: number })?.current}
+              />
+            </div>
 
+            <div className="widget-corner bottom-left">
+              <VelocityVectors vx={data.velocity.vx} vy={data.velocity.vy} position="left" />
+            </div>
+
+            <div className="widget-corner bottom-right">
+              <VelocityVectors vx={data.velocity.vx} vy={data.velocity.vy} position="right" />
+            </div>
+          </ArtificialHorizon>
+        </div>
+      </div>
+
+      {/* Bottom Telemetry Strip */}
+      <div className="panel" style={{ margin: '0 12px 12px 12px', flex: '0 0 auto' }}>
+        <TelemetryPanel data={data} />
       </div>
     </div>
   );

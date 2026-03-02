@@ -150,8 +150,27 @@ def get_data():
     with lock:
         return latest_data.copy()
 
+# global master instance for external triggers
+global_master = None
+
 # ================= MAIN =================
+def trigger_takeoff(altitude=10.0):
+    global global_master
+    if global_master:
+        print(f"Triggering takeoff to {altitude}m...")
+        global_master.mav.command_long_send(
+            global_master.target_system,
+            global_master.target_component,
+            mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
+            0,
+            0, 0, 0, 0, 0, 0, altitude
+        )
+        return True
+    print("Takeoff failed: MAVLink master not connected")
+    return False
+
 def main():
+    global global_master
     print(f"Attempting to connect to MAVLink hardware on {COM_PORT}...")
     while True:
         try:
@@ -161,6 +180,7 @@ def main():
                 autoreconnect=True,
                 robust_parsing=True
             )
+            global_master = master
             break
         except Exception as e:
             # print(f"Failed to connect to {COM_PORT}: {e}. Retrying in 5s...")
@@ -186,15 +206,20 @@ def main():
     tel = Tel()
     last_print = 0.0
 
-    while True:
-        msg = master.recv_match(blocking=False)
-        if(msg is None):
-            continue
-        if msg.get_type() == "BAD_DATA":
-            print("Bad data")
-            continue
+    bad_data_count = 0
 
+    while True:
+        msg = master.recv_match(blocking=True, timeout=0.1)
+        if msg is None:
+            continue
+        
         mtype = msg.get_type()
+        
+        if mtype == "BAD_DATA":
+            bad_data_count += 1
+            if bad_data_count % 100 == 1:
+                print(f"Skipped {bad_data_count} Bad data packets")
+            continue
 
         # Save selected messages to JSON
         if mtype in LOG_MESSAGE_TYPES:

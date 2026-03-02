@@ -1,15 +1,17 @@
-import { Battery, Thermometer, Wifi, HardDrive, Cpu } from 'lucide-react';
+
 
 
 interface TelemetryData {
   position: { x: number; y: number; z: number };
   velocity: { vx: number; vy: number; vz: number };
   attitude: { pitch: number; roll: number; yaw: number };
-  battery: number;
+  battery: { percent: number; voltage: number; current: number } | number;
   temperature: number;
   linkQuality: number;
   storage: number;
   cpuLoad: number;
+  mode?: string;
+  armed?: boolean;
 }
 
 interface TelemetryPanelProps {
@@ -20,10 +22,6 @@ export function TelemetryPanel({ data }: TelemetryPanelProps) {
 
   return (
     <div className="tpanel-container">
-      <div className="panel-title">
-        TELEMETRY DATA
-      </div>
-
       {/* Position */}
       <div className="tpanel-section">
         <div className="tpanel-section-title">RELATIVE POSITION (m)</div>
@@ -68,11 +66,11 @@ export function TelemetryPanel({ data }: TelemetryPanelProps) {
         <div className="tpanel-grid">
           <div>
             <span className="tpanel-label">Pitch:</span>
-            <span className="tpanel-val-purple">{data.attitude.pitch.toFixed(1)}°</span>
+            <span className="tpanel-val-purple">{data.attitude.pitch.toFixed(1)}</span>
           </div>
           <div>
             <span className="tpanel-label">Roll:</span>
-            <span className="tpanel-val-purple">{data.attitude.roll.toFixed(1)}°</span>
+            <span className="tpanel-val-purple">{data.attitude.roll.toFixed(1)}</span>
           </div>
           <div>
             <span className="tpanel-label">Yaw:</span>
@@ -81,49 +79,6 @@ export function TelemetryPanel({ data }: TelemetryPanelProps) {
         </div>
       </div>
 
-      {/* System Status */}
-      <div className="tpanel-system-section">
-        <div className="tpanel-section-title"> </div>
-
-        <div className="tpanel-system-row">
-          <div className="tpanel-system-label-group">
-            <Battery className="tpanel-icon" />
-            <span className="text-color-slate"></span>
-          </div>
-
-        </div>
-
-        <div className="tpanel-system-row">
-          <div className="tpanel-system-label-group">
-            <Thermometer className="tpanel-icon" />
-            <span className="text-color-slate"></span>
-          </div>
-
-        </div>
-
-        <div className="tpanel-system-row">
-          <div className="tpanel-system-label-group">
-            <Wifi className="tpanel-icon" />
-            <span className="text-color-slate"></span>
-          </div>
-        </div>
-
-        <div className="tpanel-system-row">
-          <div className="tpanel-system-label-group">
-            <HardDrive className="tpanel-icon" />
-            <span className="text-color-slate"></span>
-          </div>
-
-        </div>
-
-        <div className="tpanel-system-row">
-          <div className="tpanel-system-label-group">
-            <Cpu className="tpanel-icon" />
-            <span className="text-color-slate"></span>
-          </div>
-
-        </div>
-      </div>
     </div>
   );
 }

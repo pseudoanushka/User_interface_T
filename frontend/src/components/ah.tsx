@@ -1,28 +1,14 @@
-import { useRef, useEffect } from 'react';
-import { Compass } from './Compass';
-import { ResultantVelocityWidget } from './ResultantVelocityWidget';
-import { BatteryIndicator } from './BatteryIndicator';
-import { VelocityVectors } from './VelocityVectors';
+import React, { useRef, useEffect } from 'react';
 
 interface ArtificialHorizonProps {
-  pitch: number; // degrees
-  roll: number; // degrees
-  yaw: number; // degrees
-  batteryPercent?: number;
-  batteryV?: number;
-  batteryA?: number;
-  vx?: number;
-  vy?: number;
-  vz?: number;
-  mode?: string;
-  armed?: boolean;
+  pitch: number;
+  roll: number;
+  yaw: number;
+  children?: React.ReactNode;
 }
 
-export function ArtificialHorizon({ pitch, roll, yaw, batteryPercent, batteryV, batteryA, vx = 0, vy = 0, vz = 0, mode = "UNKNOWN", armed = false }: ArtificialHorizonProps) {
+export function ArtificialHorizon({ pitch, roll, yaw, children }: ArtificialHorizonProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  const vh = Math.sqrt(vx * vx + vy * vy);
-  const vv = vz;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -64,7 +50,7 @@ export function ArtificialHorizon({ pitch, roll, yaw, batteryPercent, batteryV, 
     ctx.fill();
 
     // Ground (brown)
-    ctx.fillStyle = '#78350f';
+    ctx.fillStyle = '#78360fb3';
     ctx.beginPath();
     ctx.arc(0, 0, radius, 0, Math.PI, false);
     ctx.closePath();
@@ -82,18 +68,26 @@ export function ArtificialHorizon({ pitch, roll, yaw, batteryPercent, batteryV, 
     ctx.stroke();
 
     // Pitch ladder
-    ctx.strokeStyle = '#ffffff';
+    ctx.strokeStyle = '#f1eeeeff';
     ctx.lineWidth = Math.max(1, radius * 0.005);
     const pitchFontSize = Math.max(12, radius * 0.12);
     ctx.font = `${pitchFontSize}px monospace`;
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'right';
 
-    for (let angle = -60; angle <= 60; angle += 10) {
-      if (angle === 0) continue;
+    // Generate pitch ladder marks dynamically around the current pitch
+    // This creates an infinite sliding window (popping smallest, adding next)
+    const startPitch = Math.floor((pitch - 60) / 10) * 10;
+    const endPitch = Math.ceil((pitch + 60) / 10) * 10;
+
+    for (let angle = startPitch; angle <= endPitch; angle += 10) {
+      if (angle === 0) continue; // skip 0 (horizon line)
 
       const y = pitchOffset - (angle / 90) * radius * 0.8;
+
+      // Only draw if within the clipping area of the circle
       if (Math.abs(y) < radius) {
+        // ... draw
         const lineWidth = angle % 20 === 0 ? radius * 0.1 : radius * 0.05;
 
         ctx.beginPath();
@@ -145,11 +139,11 @@ export function ArtificialHorizon({ pitch, roll, yaw, batteryPercent, batteryV, 
     ctx.stroke();
 
     // Roll scale
-    ctx.strokeStyle = '#94a3b8';
+    ctx.strokeStyle = '#050608ff';
     ctx.lineWidth = Math.max(2, radius * 0.01);
-    ctx.fillStyle = '#94a3b8';
+    ctx.fillStyle = '#0a0b0cff';
 
-    let rollMarks = [-60, -45, -30, -20, -10, 0, 10, 20, 30, 45, 60];
+    const rollMarks = [-60, -45, -30, -20, -10, 0, 10, 20, 30, 45, 60];
 
     while (roll > rollMarks[rollMarks.length - 1]) {
       rollMarks.shift();
@@ -182,7 +176,7 @@ export function ArtificialHorizon({ pitch, roll, yaw, batteryPercent, batteryV, 
         ctx.save();
         const rollFontSize = Math.max(10, radius * 0.06);
         ctx.font = `${rollFontSize}px monospace`;
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#000000'; // Change color of angle measurements to black
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
@@ -215,62 +209,23 @@ export function ArtificialHorizon({ pitch, roll, yaw, batteryPercent, batteryV, 
 
   return (
     <div className="ah-panel">
+      {children}
       <div className="ah-title">
-        ARTIFICIAL HORIZON
+
       </div>
 
       {/* Wrapper for Canvas and Absolute Overlay */}
       <div className="ah-wrapper">
         <canvas
           ref={canvasRef}
-          width={300}
-          height={300}
+          width={1500}
+          height={1500}
           className="ah-canvas"
+          style={{ width: '500px', height: '500px', borderRadius: '50%' }}
         />
 
         {/* INTERNAL OVERLAY ADDITION */}
         <div className="ah-overlay">
-
-          {/* 2. Velocity axis labels (Top-right corner) */}
-          <VelocityVectors vh={vh} vv={vv} />
-
-          {/* 3. Bottom-left corner Compass widget */}
-          <div className="ah-compass-container">
-            <Compass heading={yaw} />
-          </div>
-
-          {/* 4. Bottom-right corner Battery indicator block */}
-          <BatteryIndicator batteryPercent={batteryPercent} batteryV={batteryV} batteryA={batteryA} />
-
-          {/* 5. Top-left corner: Hoverable Velocity Vector Widget */}
-          <ResultantVelocityWidget vx={vx} vy={vy} vh={vh} />
-
-        </div>
-      </div>
-
-      <div className="ah-stats-grid">
-        <div className="ah-stat-item">
-          <div className="ah-stat-label">PITCH</div>
-          <div className="ah-stat-value">{pitch.toFixed(1)}°</div>
-        </div>
-        <div className="ah-stat-item">
-          <div className="ah-stat-label">ROLL</div>
-          <div className="ah-stat-value">{roll.toFixed(1)}°</div>
-        </div>
-        <div className="ah-stat-item">
-          <div className="ah-stat-label">YAW</div>
-          <div className="ah-stat-value">{yaw.toFixed(1)}°</div>
-        </div>
-      </div>
-
-      <div className="ah-mode-arm-container">
-        <div className="ah-mode-text">
-          <span>MODE: </span>
-          <span className="ah-mode-val">{mode}</span>
-        </div>
-        <div className="ah-arm-text">
-          <span>ARM: </span>
-          <span className={armed ? 'ah-arm-val-armed' : 'ah-arm-val-disarmed'}>{armed ? 'ARMED' : 'DISARMED'}</span>
         </div>
       </div>
     </div>
