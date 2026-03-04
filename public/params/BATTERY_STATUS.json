@@ -5,7 +5,7 @@
     "type": 1,
     "temperature": 32767,
     "voltages": [
-        16047,
+        16230,
         65535,
         65535,
         65535,
@@ -17,17 +17,7 @@
         65535
     ],
     "current_battery": 0,
-    "current_consumed": 0,
+    "current_consumed": 32,
     "energy_consumed": -1,
-    "battery_remaining": 84,
-    "time_remaining": 0,
-    "charge_state": 1,
-    "voltages_ext": [
-        0,
-        0,
-        0,
-        0
-    ],
-    "mode": 0,
-    "fault_bitmask": 0
+    "battery_remaining": 88
 }

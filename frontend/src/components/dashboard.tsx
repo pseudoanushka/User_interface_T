@@ -41,7 +41,7 @@ export default function CockpitDashboard({ data }: { data: TelemetryData }) {
             </div>
 
             <div className="widget-corner bottom-left">
-              <VelocityVectors vx={data.velocity.vx} vy={data.velocity.vy} position="left" />
+              <VelocityVectors vz={data.velocity.vz} position="left" />
             </div>
 
             <div className="widget-corner bottom-right">

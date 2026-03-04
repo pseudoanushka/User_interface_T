@@ -221,7 +221,7 @@ export function ArtificialHorizon({ pitch, roll, yaw, children }: ArtificialHori
           width={1500}
           height={1500}
           className="ah-canvas"
-          style={{ width: '500px', height: '500px', borderRadius: '50%' }}
+          style={{ width: '550px', height: '550px', borderRadius: '50%' }}
         />
 
         {/* INTERNAL OVERLAY ADDITION */}

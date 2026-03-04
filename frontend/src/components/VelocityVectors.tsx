@@ -3,38 +3,30 @@ import React from 'react';
 interface VelocityVectorsProps {
     vx?: number;
     vy?: number;
+    vz?: number;
     position?: 'left' | 'right';
 }
 
-export const VelocityVectors: React.FC<VelocityVectorsProps> = ({ vx = 0, vy = 0, position = 'right' }) => {
-    // In the user's terms, vMax is the resultant of vh and vv, but the user says
-    // "if Vy increases then the height of the arrow increases... v max is resultant velocity of the vh and vv"
-    const vMax = Math.sqrt(vx * vx + vy * vy);
+export const VelocityVectors: React.FC<VelocityVectorsProps> = ({ vx = 0, vy = 0, vz = 0, position = 'right' }) => {
+    // For the right gauge (Vh), vMax is the resultant of vx and vy
+    // For the left gauge (Vv), vMax is simply the absolute value of vz
+    const vMax = position === 'left' ? Math.abs(vz) : Math.sqrt(vx * vx + vy * vy);
 
-    // Calculate angle based on joystick (vx, vy). 
-    // The user mentions "height of arrow should increase by the amplitude that is tan-1 vx/vy". 
-    // Usually tan-1(vx/vy) is the angle. We use atan2 to get the full 360 direction.
-    // We map 0deg to UP, so angle is based on vx and vy.
+    // Calculate angle based on joystick (vx, vy) for the right gauge.
     let angle = Math.atan2(vy, vx) * (180 / Math.PI) - 90;
 
     if (position === 'left') {
-        // The arrow should either go up or down.
-        if (Math.abs(vy) > Math.abs(vx)) {
-            // If vy is dominant (coming down/up)
-            angle = vy > 0 ? 90 : -90;
-        } else {
-            // If vx is dominant (forward/backward)
-            angle = vx >= 0 ? -90 : 90;
-        }
+        // For the left gauge (Vertical Velocity):
+        // If vz is positive, point UP (but since it's inverted, we swap the angles)
+        angle = vz >= 0 ? 90 : -90;
     }
 
     // The length of the arrow should map to Vmax, scaling as it increases/decreases
     // Max length is 58px. To reach that at 3 m/s: 58 / 3 ≈ 19.333
-    const arrowLength = Math.min(58, vMax * (58 / 3));
+    const arrowLength = Math.min(58, vMax * (58 / 0.5));
 
-    // Scale the physical size of the arrowhead for the right gauge as velocity increases
-    // Max scale addition is 1.5. To cap that at 3 m/s: 1.5 / 3 = 0.5
-    const arrowScale = position === 'right' ? 1 + Math.min(vMax * 0.5, 1.5) : 1;
+    // The head of the arrow should not increase in size, only the tail.
+    const arrowScale = 1;
 
     return (
         <div className={position === 'left' ? "ah-rv-widget" : "ah-vv-box"} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
