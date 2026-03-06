@@ -183,9 +183,8 @@ def main():
             global_master = master
             break
         except Exception as e:
-            # print(f"Failed to connect to {COM_PORT}: {e}. Retrying in 5s...")
-            # # time.sleep(5)
-            print(e)
+            print(f"Failed to connect to {COM_PORT}: {e}. Retrying in 5s...")
+            time.sleep(5)
 
     while True:
         print("Waiting for heartbeat...")
