@@ -19,42 +19,49 @@ interface TelemetryData {
 
 export default function CockpitDashboard({ data }: { data: TelemetryData }) {
   return (
-    <div className="cockpit-container">
-      <div className="cockpit-grid">
-        <div className="attitude-container">
-          <ArtificialHorizon
-            pitch={data.attitude.pitch}
-            roll={data.attitude.roll}
-            yaw={data.attitude.yaw}
-          >
-            {/* Embedded Widgets for Four-Corner Layout */}
-            <div className="widget-corner top-left">
-              <Compass heading={data.attitude.yaw} />
-            </div>
+    <>
+      <img
+        src="http://localhost:5000/video_feed"
+        className="video-background"
+        alt="ArUco Camera Feed"
+      />
+      <div className="cockpit-container">
+        <div className="cockpit-grid">
+          <div className="attitude-container">
+            <ArtificialHorizon
+              pitch={data.attitude.pitch}
+              roll={data.attitude.roll}
+              yaw={data.attitude.yaw}
+            >
+              {/* Embedded Widgets for Four-Corner Layout */}
+              <div className="widget-corner top-left">
+                <Compass heading={data.attitude.yaw} />
+              </div>
 
-            <div className="widget-corner top-right">
-              <BatteryIndicator
-                batteryPercent={typeof data.battery === 'number' ? data.battery : (data.battery as { percent?: number })?.percent}
-                batteryV={(data.battery as { voltage?: number })?.voltage}
-                batteryA={(data.battery as { current?: number })?.current}
-              />
-            </div>
+              <div className="widget-corner top-right">
+                <BatteryIndicator
+                  batteryPercent={typeof data.battery === 'number' ? data.battery : (data.battery as { percent?: number })?.percent}
+                  batteryV={(data.battery as { voltage?: number })?.voltage}
+                  batteryA={(data.battery as { current?: number })?.current}
+                />
+              </div>
 
-            <div className="widget-corner bottom-left">
-              <VelocityVectors vz={data.velocity.vz} position="left" />
-            </div>
+              <div className="widget-corner bottom-left">
+                <VelocityVectors vz={data.velocity.vz} position="left" />
+              </div>
 
-            <div className="widget-corner bottom-right">
-              <VelocityVectors vx={data.velocity.vx} vy={data.velocity.vy} position="right" />
-            </div>
-          </ArtificialHorizon>
+              <div className="widget-corner bottom-right">
+                <VelocityVectors vx={data.velocity.vx} vy={data.velocity.vy} position="right" />
+              </div>
+            </ArtificialHorizon>
+          </div>
+        </div>
+
+        {/* Bottom Telemetry Strip */}
+        <div className="panel" style={{ margin: '0 12px 12px 12px', flex: '0 0 auto' }}>
+          <TelemetryPanel data={data} />
         </div>
       </div>
-
-      {/* Bottom Telemetry Strip */}
-      <div className="panel" style={{ margin: '0 12px 12px 12px', flex: '0 0 auto' }}>
-        <TelemetryPanel data={data} />
-      </div>
-    </div>
+    </>
   );
 }

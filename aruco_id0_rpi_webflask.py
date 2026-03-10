@@ -199,3 +199,5 @@ if __name__ == '__main__':
     # Start Flask on all interfaces so it's accessible via RPi's IP
     # Access via: http://<your-rpi-ip>:5000
     app.run(host='0.0.0.0', port=5000, threaded=True)  
+
+    

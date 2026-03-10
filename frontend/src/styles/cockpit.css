@@ -43,13 +43,30 @@ body {
 /* =============================== MAIN GRID =============================== */
 
 .cockpit-container {
-  width: 100%;
-  height: 100%;
+  width: 50vw;
+  min-width: 850px;
+  max-width: 1000px;
+  height: 100vh;
   margin: 0;
   border: none;
   background: transparent;
   display: flex;
   flex-direction: column;
+  position: relative;
+  /* Ensure it stays above video */
+  z-index: 1;
+}
+
+.video-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -1;
+  opacity: 0.6;
+  /* Dim it slightly if you want HUD to pop more, change to 1.0 for full brightness */
 }
 
 .cockpit-grid {

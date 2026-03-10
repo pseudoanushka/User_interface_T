@@ -26,7 +26,7 @@ latest_data = {
 }
 
 # ================= CONFIG =================
-COM_PORT = "COM11"
+COM_PORT = "COM13"
 BAUD = 115200
 PARAMS_DIR = os.path.join("public", "params")
 
@@ -43,6 +43,7 @@ LOG_MESSAGE_TYPES = {
     "RAW_IMU",
     "SCALED_IMU2",
     "LOCAL_POSITION_NED",
+    "STATUSTEXT",
 }
 
 os.makedirs(PARAMS_DIR, exist_ok=True)
@@ -92,8 +93,17 @@ def save_message_to_json(msg):
     try:
         file_path = os.path.join(PARAMS_DIR, f"{msg.get_type()}.json")
         with open(file_path, "w") as f:
-            json.dump(msg.to_dict(), f, indent=4)    
-        # print(f"Saved {msg.get_type()}.json at {datetime.datetime.now()}")
+            # Some MAVLink messages (like STATUSTEXT) contain bytearrays in their dictionary representation.
+            # We must convert byte arrays to strings so json.dump doesn't crash!
+            msg_dict = msg.to_dict()
+            for k, v in msg_dict.items():
+                if isinstance(v, (bytes, bytearray)):
+                    try:
+                        msg_dict[k] = v.decode('utf-8')
+                    except Exception:
+                        msg_dict[k] = list(v)
+
+            json.dump(msg_dict, f, indent=4)    
     except Exception as e:
         print(f"JSON save error ({msg.get_type()}): {e}")
 
@@ -201,6 +211,9 @@ def main():
     # request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_ODOMETRY, 20)
     request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_OPTICAL_FLOW_RAD, 5)
     request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_DISTANCE_SENSOR, 5)
+    request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_STATUSTEXT, 5)
+    
+    
 
     tel = Tel()
     last_print = 0.0
@@ -262,6 +275,21 @@ def main():
 
         elif mtype == "DISTANCE_SENSOR":
             tel.dist_m = msg.current_distance / 100.0
+            
+        elif mtype == "STATUSTEXT":
+            try:
+                tel.last_msg = getattr(msg, 'text', '')
+                tel.last_msg_time = time.time()
+                print(tel.last_msg)
+            except Exception as e:
+                print(f"Error processing STATUSTEXT: {e}")   
+        elif mtype == "FLIGHTMODE":
+            tel.flight_mode = msg.mode
+            save_message_to_json(msg)
+            print(msg)
+
+
+
         with lock:
             latest_data.update({
                 "mode": tel.flight_mode,
@@ -292,7 +320,8 @@ def main():
                 },
 
                 "distance": tel.dist_m if tel.dist_m is not None else 0.0,
-                "flow_q": tel.flow_q if tel.flow_q is not None else 0
+                "flow_q": tel.flow_q if tel.flow_q is not None else 0,
+                "statusText": tel.last_msg
             })
             # ---- Dashboard Print @5Hz ----
             now = time.time()

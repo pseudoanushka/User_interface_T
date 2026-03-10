@@ -45,7 +45,7 @@ export default function App() {
       }
 
       if (isMounted) {
-        timeoutId = setTimeout(fetchData, 20);
+        timeoutId = setTimeout(fetchData, 200);
       }
     };
 
