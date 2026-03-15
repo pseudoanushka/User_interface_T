@@ -111,12 +111,12 @@ body {
 
 .widget-corner.bottom-left {
   bottom: 20px;
-  left: 20px;
+  left: 10px;
 }
 
 .widget-corner.bottom-right {
   bottom: 20px;
-  right: 20px;
+  right: 5px;
 }
 
 

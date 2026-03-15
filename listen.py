@@ -26,7 +26,7 @@ latest_data = {
 }
 
 # ================= CONFIG =================
-COM_PORT = "COM13"
+COM_PORT = "COM11"
 BAUD = 115200
 PARAMS_DIR = os.path.join("public", "params")
 
@@ -211,9 +211,18 @@ def main():
     # request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_ODOMETRY, 20)
     request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_OPTICAL_FLOW_RAD, 5)
     request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_DISTANCE_SENSOR, 5)
-    request_message_hz(master, mavutil.mavlink.MAVLINK_MSG_ID_STATUSTEXT, 5)
     
-    
+    # MAVLINK_MSG_ID_STATUSTEXT (253) doesn't stream via SET_MESSAGE_INTERVAL
+    # But we can try explicitly requesting a single one via REQUEST_MESSAGE (512)
+    print("Requesting a one-time STATUSTEXT emission...")
+    master.mav.command_long_send(
+        master.target_system,
+        master.target_component,
+        mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE,
+        0,
+        mavutil.mavlink.MAVLINK_MSG_ID_STATUSTEXT,
+        0, 0, 0, 0, 0, 0
+    )
 
     tel = Tel()
     last_print = 0.0
@@ -277,12 +286,21 @@ def main():
             tel.dist_m = msg.current_distance / 100.0
             
         elif mtype == "STATUSTEXT":
+            print(f"RAW STATUSTEXT RECEIVED: {msg}")
             try:
-                tel.last_msg = getattr(msg, 'text', '')
+                # The text attribute can come in as a string or byte array
+                raw_text = getattr(msg, 'text', '')
+                if isinstance(raw_text, (bytes, bytearray)):
+                    raw_text = raw_text.decode('utf-8', errors='ignore')
+                elif isinstance(raw_text, list):
+                    raw_text = "".join([chr(c) for c in raw_text if c != 0])
+                
+                # Also strip any trailing null bytes
+                tel.last_msg = str(raw_text).strip('\x00').strip()
                 tel.last_msg_time = time.time()
-                print(tel.last_msg)
+                print(f"PARSED TEXT: {tel.last_msg}")
             except Exception as e:
-                print(f"Error processing STATUSTEXT: {e}")   
+                print(f"Error processing STATUSTEXT: {e}") 
         elif mtype == "FLIGHTMODE":
             tel.flight_mode = msg.mode
             save_message_to_json(msg)
