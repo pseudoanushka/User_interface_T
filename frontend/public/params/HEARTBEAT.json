@@ -3,7 +3,7 @@
     "type": 2,
     "autopilot": 12,
     "base_mode": 81,
-    "custom_mode": 196608,
+    "custom_mode": 458752,
     "system_status": 3,
     "mavlink_version": 3
 }

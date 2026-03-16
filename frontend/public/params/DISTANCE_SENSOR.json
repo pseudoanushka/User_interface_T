@@ -1,6 +1,6 @@
 {
     "mavpackettype": "DISTANCE_SENSOR",
-    "time_boot_ms": 1447362,
+    "time_boot_ms": 7704258,
     "min_distance": 8,
     "max_distance": 3000,
     "current_distance": 0,

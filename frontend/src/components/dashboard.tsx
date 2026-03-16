@@ -3,6 +3,7 @@ import { ArtificialHorizon } from "./ah";
 import { Compass } from "./Compass";
 import { BatteryIndicator } from "./BatteryIndicator";
 import { VelocityVectors } from "./VelocityVectors";
+import { CameraFeed } from "./CameraFeed";
 
 interface TelemetryData {
   position: { x: number; y: number; z: number };
@@ -25,6 +26,7 @@ export default function CockpitDashboard({ data }: { data: TelemetryData }) {
         className="video-background"
         alt="ArUco Camera Feed"
       />
+      <CameraFeed />
       <div className="cockpit-container">
         <div className="cockpit-grid">
           <div className="attitude-container">
