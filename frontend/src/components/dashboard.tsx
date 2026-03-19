@@ -4,6 +4,8 @@ import { Compass } from "./Compass";
 import { BatteryIndicator } from "./BatteryIndicator";
 import { VelocityVectors } from "./VelocityVectors";
 import { CameraFeed } from "./CameraFeed";
+import { ChargingStatusPanel } from "./ChargingStatusPanel";
+import { MissionDataPanel } from "./MissionDataPanel";
 
 interface TelemetryData {
   position: { x: number; y: number; z: number };
@@ -21,12 +23,9 @@ interface TelemetryData {
 export default function CockpitDashboard({ data }: { data: TelemetryData }) {
   return (
     <>
-      <img
-        src="http://localhost:5000/video_feed"
-        className="video-background"
-        alt="ArUco Camera Feed"
-      />
       <CameraFeed />
+      <ChargingStatusPanel />
+      <MissionDataPanel />
       <div className="cockpit-container">
         <div className="cockpit-grid">
           <div className="attitude-container">
@@ -49,11 +48,11 @@ export default function CockpitDashboard({ data }: { data: TelemetryData }) {
               </div>
 
               <div className="widget-corner bottom-left">
-                <VelocityVectors vz={data.velocity.vz} position="left" />
+                <VelocityVectors vz={data.position.z} position="left" />
               </div>
 
               <div className="widget-corner bottom-right">
-                <VelocityVectors vx={data.velocity.vx} vy={data.velocity.vy} position="right" />
+                <VelocityVectors vx={data.position.x} vy={data.position.y} position="right" />
               </div>
             </ArtificialHorizon>
           </div>

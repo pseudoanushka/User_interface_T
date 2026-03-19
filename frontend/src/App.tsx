@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import CockpitDashboard from "./components/dashboard";
 import { io } from "socket.io-client";
+import { getWsUrl, getBaseUrl } from "./config";
 
 // Global WebSocket connection for sending commands (like takeoff)
-const socket = io("http://localhost:8000");
+const socket = io(getWsUrl());
 
 const defaultData = {
   position: { x: 0, y: 0, z: 0 },
@@ -27,17 +28,18 @@ export default function App() {
 
     const fetchData = async () => {
       try {
-        const response = await fetch("http://localhost:8000/telemetry");
+        const response = await fetch(`${getBaseUrl()}/telemetry`);
         if (response.ok && isMounted) {
           const json = await response.json();
+          const zigbee = json.ZIGBEE ?? json; // fallback to json directly if old format
           setData({
             ...defaultData,
-            ...json,
-            battery: typeof json.battery === 'object' ? json.battery : { percent: json.battery ?? 0, voltage: 0, current: 0 },
-            temperature: json.temperature ?? 45,
-            linkQuality: json.linkQuality ?? 95,
-            storage: json.storage ?? 50,
-            cpuLoad: json.cpuLoad ?? 20
+            ...zigbee,
+            battery: typeof zigbee.battery === 'object' ? zigbee.battery : { percent: zigbee.battery ?? 0, voltage: 0, current: 0 },
+            temperature: zigbee.temperature ?? 45,
+            linkQuality: zigbee.linkQuality ?? 95,
+            storage: zigbee.storage ?? 50,
+            cpuLoad: zigbee.cpuLoad ?? 20
           });
         }
       } catch (error) {

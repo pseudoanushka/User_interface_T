@@ -22,8 +22,9 @@ export const VelocityVectors: React.FC<VelocityVectorsProps> = ({ vx = 0, vy = 0
     }
 
     // The length of the arrow should map to Vmax, scaling as it increases/decreases
-    // Max length is 58px. To reach that at 3 m/s: 58 / 3 ≈ 19.333
-    const arrowLength = Math.min(58, vMax * (58 / 0.5));
+    // Max reference value is set to 10 so it grows proportionally for values like 7.8 without immediately hitting max.
+    const maxReference = 3; // Arrow reaches max length at 3m / 3 m/s
+    const arrowLength = Math.min(58, vMax * (58 / maxReference));
 
     // The head of the arrow should not increase in size, only the tail.
     const arrowScale = 1;

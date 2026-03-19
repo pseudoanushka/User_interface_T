@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 import math
@@ -8,6 +9,110 @@ from typing import Optional
 from pymavlink import mavutil
 from threading import Lock
 import datetime
+import serial
+import threading
+
+ARDUINO_PORT = "COM15"
+
+# Absolute path to the project root (where listen.py lives)
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_STATION_JSON = os.path.join(_BASE_DIR, "public", "params", "BASE_STATION_DATA.json")
+ARDUINO_BAUD = 9600
+
+arduino_lock = Lock()
+arduino_data = {"raw": "No data yet"}
+arduino_ser = None
+
+def read_arduino_thread():
+    global arduino_ser
+    try:
+        arduino_ser = serial.Serial(ARDUINO_PORT, ARDUINO_BAUD, timeout=1)
+        time.sleep(2)
+        print(f"Arduino connected on {ARDUINO_PORT}")
+    except serial.SerialException as e:
+        print(f"Arduino connection error: {e}")
+        return
+    while True:
+        try:
+            if arduino_ser and arduino_ser.in_waiting > 0:
+                line = arduino_ser.readline().decode('utf-8', errors='replace').strip()
+                if line:
+                    with arduino_lock:
+                        arduino_data["raw"] = line
+                    # Inline parse and write to BASE_STATION_DATA.json
+                    try:
+                        relay_m  = re.search(r'Relay:\s*(\w+)', line)
+                        ca0_m    = re.search(r'Current A0:\s*([\d.]+)\s*A', line)
+                        ca1_m    = re.search(r'Current A1:\s*([\d.]+)\s*A', line)
+                        vs1_m    = re.search(r'Voltage S1:\s*([\d.]+)\s*V', line)
+                        vs2_m    = re.search(r'Voltage S2:\s*([\d.]+)\s*V', line)
+                        parsed = {
+                            "relay":      relay_m.group(1).upper() if relay_m else "UNKNOWN",
+                            "currentA0":  float(ca0_m.group(1))   if ca0_m  else 0.0,
+                            "currentA1":  float(ca1_m.group(1))   if ca1_m  else 0.0,
+                            "voltageS1":  float(vs1_m.group(1))   if vs1_m  else 0.0,
+                            "voltageS2":  float(vs2_m.group(1))   if vs2_m  else 0.0,
+                            "raw": line
+                        }
+                        with open(BASE_STATION_JSON, "w") as f:
+                            json.dump(parsed, f, indent=4)
+                    except Exception as ex:
+                        print(f"[Arduino] JSON write error: {ex}")
+        except serial.SerialException as e:
+            print(f"[Arduino] Read Error:{e}")
+            break
+        time.sleep(0.01)
+
+def send_arduino_cmd(cmd: str) -> bool:
+    """Send a command (like 'on\\n' or 'off\\n') to the Arduino."""
+    global arduino_ser
+    if arduino_ser and arduino_ser.is_open:
+        try:
+            # Ensure the command ends with a newline as Arduino usually expects it
+            if not cmd.endswith('\n'):
+                cmd += '\n'
+            arduino_ser.write(cmd.encode('utf-8'))
+            return True
+        except Exception as e:
+            print(f"[Arduino] Write Error: {e}")
+    return False
+
+def get_arduino_data():
+    with arduino_lock:
+        raw = arduino_data.get("raw", "")
+    
+    parsed = {
+        "relay": "UNKNOWN",
+        "currentA0": 0.0,
+        "currentA1": 0.0,
+        "voltageS1": 0.0,
+        "voltageS2": 0.0,
+        "raw": raw
+    }
+    
+    try:
+        import re
+        # Parse: "Relay: OFF  |  Current A0: 0.00 A  |  Current A1: 0.04 A  |  Voltage S1: 0.00 V  |  Voltage S2: 0.00 V"
+        relay_match = re.search(r'Relay:\s*(\w+)', raw)
+        ca0_match   = re.search(r'Current A0:\s*([\d.]+)\s*A', raw)
+        ca1_match   = re.search(r'Current A1:\s*([\d.]+)\s*A', raw)
+        vs1_match   = re.search(r'Voltage S1:\s*([\d.]+)\s*V', raw)
+        vs2_match   = re.search(r'Voltage S2:\s*([\d.]+)\s*V', raw)
+
+        if relay_match: parsed["relay"]      = relay_match.group(1).upper()
+        if ca0_match:   parsed["currentA0"]  = float(ca0_match.group(1))
+        if ca1_match:   parsed["currentA1"]  = float(ca1_match.group(1))
+        if vs1_match:   parsed["voltageS1"]  = float(vs1_match.group(1))
+        if vs2_match:   parsed["voltageS2"]  = float(vs2_match.group(1))
+    except Exception:
+        pass
+
+    return parsed
+
+
+
+
+
 
 lock = Lock()
 latest_data = {
@@ -28,7 +133,7 @@ latest_data = {
 # ================= CONFIG =================
 COM_PORT = "COM11"
 BAUD = 115200
-PARAMS_DIR = os.path.join("public", "params")
+PARAMS_DIR = os.path.join(_BASE_DIR, "public", "params")
 
 # Messages you want saved as JSON
 LOG_MESSAGE_TYPES = {
@@ -181,6 +286,7 @@ def trigger_takeoff(altitude=10.0):
 
 def main():
     global global_master
+    threading.Thread(target=read_arduino_thread, daemon=True).start()
     print(f"Attempting to connect to MAVLink hardware on {COM_PORT}...")
     while True:
         try:

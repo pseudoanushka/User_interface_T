@@ -1,0 +1,8 @@
+{
+    "relay": "OFF",
+    "currentA0": 0.0,
+    "currentA1": 0.04,
+    "voltageS1": 0.0,
+    "voltageS2": 0.0,
+    "raw": "Relay: OFF  |  Current A0: 0.00 A  |  Current A1: 0.04 A  |  Voltage S1: 0.00 V  |  Voltage S2: 0.00 V"
+}

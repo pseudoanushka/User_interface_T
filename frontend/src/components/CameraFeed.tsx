@@ -1,108 +1,457 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-const IP = "192.168.43.136";
+import { getRpiWsUrl, getRpiUrl, BACKEND_IP } from "../config";
+
+const styles = `
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;600;700&display=swap');
+
+  .gcs-root {
+    position: fixed;
+    left: 40%;
+    top: 1.5%;
+    width: 30%;
+    height: 68%;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    border-radius: 0 0 0 8px;
+    overflow: hidden;
+    background: #020617;
+    border: 1px solid #1a3040;
+    box-shadow: 0 0 0 1px #0d1f2d, 0 8px 40px rgba(0,0,0,0.7);
+  }
+
+  /* ── Header ── */
+  .gcs-header {
+    background: #020617;
+    border-bottom: 1px solid #1a3040;
+    padding: 7px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  .gcs-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 28px;
+    letter-spacing: 3px;
+    color: #dbecf0ff;
+    text-transform: uppercase;
+  }
+
+  .gcs-meta {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .gcs-stat {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    letter-spacing: 1.5px;
+    color: #1d4e5f;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .gcs-stat span {
+    color: #22a6c0;
+  }
+
+  .link-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #1a6632;
+    transition: background 0.3s;
+  }
+  .link-dot.armed   { background: #c0392b; animation: blink 0.9s step-start infinite; }
+  .link-dot.airborne{ background: #2980b9; animation: blink 1.4s step-start infinite; }
+  .link-dot.ok      { background: #27ae60; }
+
+  @keyframes blink { 50% { opacity: 0.2; } }
+
+  /* ── Camera feed ── */
+  .gcs-feed {
+    flex: 1;
+    position: relative;
+    background: #000;
+    overflow: hidden;
+  }
+
+  .gcs-feed img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: absolute;
+    inset: 0;
+    display: block;
+  }
+
+  /* HUD overlays */
+  .hud-corner {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-color: rgba(34,166,192,0.5);
+    border-style: solid;
+    pointer-events: none;
+  }
+  .hud-corner.tl { top: 8px; left: 8px;  border-width: 1px 0 0 1px; }
+  .hud-corner.tr { top: 8px; right: 8px; border-width: 1px 1px 0 0; }
+  .hud-corner.bl { bottom: 8px; left: 8px;  border-width: 0 0 1px 1px; }
+  .hud-corner.br { bottom: 8px; right: 8px; border-width: 0 1px 1px 0; }
+
+  .hud-label {
+    position: absolute;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: rgba(34,166,192,0.55);
+    pointer-events: none;
+    text-transform: uppercase;
+  }
+  .hud-label.tl { top: 10px; left: 26px; }
+  .hud-label.br { bottom: 10px; right: 26px; }
+
+  .hud-crosshair {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .hud-crosshair svg { opacity: 0.25; }
+
+  .no-signal {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #1a3040;
+    text-transform: uppercase;
+  }
+  .no-signal-icon {
+    font-size: 28px;
+    opacity: 0.15;
+  }
+
+  /* ── Control strip ── */
+  .gcs-controls {
+    background: #020617;
+    border-top: 1px solid #1a3040;
+    padding: 10px;
+    flex-shrink: 0;
+  }
+
+  .btn-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .gcs-btn {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 10px 8px 8px;
+    background: #0a1118;
+    border: 1px solid #192530;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Rajdhani', sans-serif;
+    transition: background 0.1s, border-color 0.15s;
+    overflow: hidden;
+  }
+
+  .gcs-btn::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: var(--acc);
+    opacity: 0.5;
+  }
+
+  .gcs-btn:hover {
+    background: #0d1820;
+    border-color: var(--acc);
+  }
+
+  .gcs-btn:active {
+    transform: scale(0.97);
+    background: color-mix(in srgb, var(--acc) 10%, #0a1118);
+  }
+
+  .gcs-btn.btn-active {
+    border-color: var(--acc);
+    background: color-mix(in srgb, var(--acc) 8%, #0a1118);
+  }
+
+  .btn-label {
+    font-size: 25px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    color: #b0bec8;
+    text-transform: uppercase;
+  }
+
+  .btn-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 20px;
+    letter-spacing: 1px;
+    color: var(--acc);
+    opacity: 0.6;
+    text-transform: uppercase;
+  }
+
+  /* confirm dialog inside ARM button */
+  .confirm-layer {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(6,11,16,0.95);
+    border-radius: 4px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    z-index: 5;
+  }
+  .confirm-layer.show { display: flex; }
+  .confirm-prompt {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 20px;
+    letter-spacing: 1.5px;
+    color: #c0392b;
+    text-transform: uppercase;
+  }
+  .confirm-row { display: flex; gap: 5px; }
+  .confirm-yes, .confirm-no {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 3px 10px;
+    border-radius: 2px;
+    border: none;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  .confirm-yes { background: #7b1d1d; color: #ffb4ab; }
+  .confirm-no  { background: #0d1820; color: #4a8fa8; border: 1px solid #1a3040; }
+
+  /* log */
+  .gcs-log {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 20px;
+    color: #1d4e5f;
+    border-top: 1px solid #0f1e28;
+    padding-top: 7px;
+  }
+  .log-ts  { color: #1a3a2a; }
+  .log-txt { color: #2d7a8a; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+`;
 
 export function CameraFeed() {
     const imgRef = useRef<HTMLImageElement>(null);
+    const [armed, setArmed] = useState(false);
+    const [status, setStatus] = useState<'ok' | 'armed' | 'airborne'>('ok');
+    const [logMsg, setLogMsg] = useState('GCS LINK ESTABLISHED');
+    const [logTs, setLogTs] = useState('');
+    const [showConfirm, setShowConfirm] = useState(false);
+
+    const now = () => {
+        const d = new Date();
+        return [d.getHours(), d.getMinutes(), d.getSeconds()]
+            .map(n => String(n).padStart(2, '0')).join(':');
+    };
+
+    const log = (msg: string) => {
+        setLogTs(now());
+        setLogMsg(msg);
+    };
 
     useEffect(() => {
-        // Handle Video WebSocket
-        const socket = new WebSocket(`ws://${IP}:8000/ws/video`);
-        
-        socket.onmessage = function(event) {
+        setLogTs(now());
+        const socket = new WebSocket(`${getRpiWsUrl()}/ws/video`);
+        socket.onmessage = (event) => {
             if (imgRef.current) {
-                const blob = new Blob([event.data], { type: "image/jpeg" });
-                const url = URL.createObjectURL(blob);
-                imgRef.current.src = url;
-                // Clean up memory to avoid leaks
-                imgRef.current.onload = () => URL.revokeObjectURL(url);
+                const blob = new Blob([event.data], { type: 'image/jpeg' });
+                imgRef.current.src = URL.createObjectURL(blob);
             }
         };
 
-        return () => {
-            socket.close();
-        };
+        return () => socket.close();
     }, []);
 
-    // Handle HTTP Commands
-    const cmd = (action: string) => {
-        fetch(`http://${IP}:8000/${action}`)
-            .then(() => console.log(`Command ${action} sent`))
-            .catch(() => alert("Connection Failed"));
+    const cmd = async (action: string) => {
+        await fetch(`${getRpiUrl()}/${action}`, {
+            method: 'GET'
+        })
+            .then(() => console.log(`Command ${action} sent to RPi`))
+            .catch(() => alert('Connection to RPi Failed'));
     };
 
-    return (
-        <div 
-            style={{
-                position: 'fixed',
-                left: '42%',
-                top: '2%',
-                width: '40%',
-                height: '50%',
-                zIndex: 50,
-                border: '2px solid #22d3ee',
-                borderRadius: '0 0 0 12px',
-                overflow: 'hidden',
-                backgroundColor: '#000',
-                display: 'flex',
-                flexDirection: 'column',
-                boxShadow: '0 0 20px rgba(34, 211, 238, 0.2)'
-            }}
-        >
-            <div style={{ 
-                backgroundColor: '#020617', 
-                color: '#22d3ee', 
-                padding: '8px', 
-                textAlign: 'center', 
-                fontWeight: 'bold', 
-                borderBottom: '1px solid #22d3ee',
-                fontFamily: '"Orbitron", monospace'
-            }}>
-                GROUND CONTROL STATION
-            </div>
-            
-            <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0 }}>
-                <img 
-                    ref={imgRef} 
-                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
-                    alt="RPi Camera Stream" 
-                />
-            </div>
+    const handleArm = () => { if (!armed) setShowConfirm(true); };
 
-            <div style={{ 
-                padding: '10px', 
-                backgroundColor: '#1a1a1a', 
-                display: 'flex', 
-                flexWrap: 'wrap', 
-                justifyContent: 'center', 
-                gap: '10px',
-                borderTop: '1px solid #22d3ee'
-            }}>
-                <button 
-                    style={{ flex: '1 1 45%', padding: '10px', fontSize: '14px', cursor: 'pointer', borderRadius: '4px', border: 'none', background: '#27ae60', color: 'white', fontWeight: 'bold' }} 
-                    onClick={() => cmd('arm')}
-                >
-                    ARM DRONE
-                </button>
-                <button 
-                    style={{ flex: '1 1 45%', padding: '10px', fontSize: '14px', cursor: 'pointer', borderRadius: '4px', border: 'none', background: '#2980b9', color: 'white', fontWeight: 'bold' }} 
-                    onClick={() => cmd('takeoff')}
-                >
-                    TAKEOFF
-                </button>
-                <button 
-                    style={{ flex: '1 1 45%', padding: '10px', fontSize: '14px', cursor: 'pointer', borderRadius: '4px', border: 'none', background: '#e67e22', color: 'white', fontWeight: 'bold' }} 
-                    onClick={() => cmd('land')}
-                >
-                    LAND
-                </button>
-                <button 
-                    style={{ flex: '1 1 45%', padding: '10px', fontSize: '14px', cursor: 'pointer', borderRadius: '4px', border: 'none', background: '#c0392b', color: 'white', fontWeight: 'bold' }} 
-                    onClick={() => cmd('disarm')}
-                >
-                    DISARM DRONE
-                </button>
+    const doArm = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setShowConfirm(false);
+        setArmed(true);
+        setStatus('armed');
+        log('ARMED — motors enabled, clear prop area');
+        cmd('arm');
+    };
+
+    const cancelArm = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setShowConfirm(false);
+        log('ARM cancelled by operator');
+    };
+
+    const handleTakeoff = () => {
+        setStatus('airborne');
+        log('TAKEOFF initiated — climbing to altitude');
+        cmd('takeoff');
+    };
+
+    const handleLand = () => {
+        setStatus('ok');
+        log('LAND initiated — auto-descent active');
+        cmd('land');
+    };
+
+    const handleDisarm = () => {
+        setArmed(false);
+        setStatus('ok');
+        log('DISARMED — motors disabled');
+        cmd('disarm');
+    };
+
+    const statusLabels = { ok: 'STANDBY', armed: 'ARMED', airborne: 'AIRBORNE' };
+
+    return (
+        <>
+            <style>{styles}</style>
+            <div className="gcs-root">
+                {/* Header */}
+                <div className="gcs-header">
+                    <div className="gcs-title">GROUND CONTROL STATION</div>
+                    <div className="gcs-meta">
+                        <div className="gcs-stat">
+                            IP <span>{BACKEND_IP}</span>
+                        </div>
+                        <div className="gcs-stat">
+                            <div className={`link-dot ${status}`} />
+                            <span>{statusLabels[status]}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Camera feed */}
+                <div className="gcs-feed">
+                    <img ref={imgRef} alt="RPi Camera Stream" />
+
+                    {/* HUD overlays */}
+                    <div className="hud-corner tl" />
+                    <div className="hud-corner tr" />
+                    <div className="hud-corner bl" />
+                    <div className="hud-corner br" />
+                    <div className="hud-label tl">CAM-01 / RGB</div>
+                    <div className="hud-label br">REC ● LIVE</div>
+
+                    <div className="hud-crosshair">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#22a6c0" strokeWidth="0.8">
+                            <line x1="12" y1="0" x2="12" y2="9" />
+                            <line x1="12" y1="15" x2="12" y2="24" />
+                            <line x1="0" y1="12" x2="9" y2="12" />
+                            <line x1="15" y1="12" x2="24" y2="12" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                    </div>
+
+                    <div className="no-signal">
+                        <div className="no-signal-icon">⊘</div>
+                        NO SIGNAL
+                    </div>
+                </div>
+
+                {/* Controls */}
+                <div className="gcs-controls">
+                    <div className="btn-grid">
+                        {/* ARM */}
+                        <button
+                            className={`gcs-btn${armed ? ' btn-active' : ''}`}
+                            style={{ '--acc': '#27ae60' } as React.CSSProperties}
+                            onClick={handleArm}
+                        >
+                            <div className="btn-label">ARM</div>
+                            <div className="btn-sub">PRE-FLIGHT</div>
+                            <div className={`confirm-layer${showConfirm ? ' show' : ''}`}>
+                                <div className="confirm-prompt">CONFIRM ARM?</div>
+                                <div className="confirm-row">
+                                    <button className="confirm-yes" onClick={doArm}>CONFIRM</button>
+                                    <button className="confirm-no" onClick={cancelArm}>CANCEL</button>
+                                </div>
+                            </div>
+                        </button>
+
+                        {/* TAKEOFF */}
+                        <button
+                            className="gcs-btn"
+                            style={{ '--acc': '#2980b9' } as React.CSSProperties}
+                            onClick={handleTakeoff}
+                        >
+                            <div className="btn-label">TAKEOFF</div>
+                            <div className="btn-sub">VTOL ASCENT</div>
+                        </button>
+
+                        {/* LAND */}
+                        <button
+                            className="gcs-btn"
+                            style={{ '--acc': '#e67e22' } as React.CSSProperties}
+                            onClick={handleLand}
+                        >
+                            <div className="btn-label">LAND</div>
+                            <div className="btn-sub">AUTO-LAND</div>
+                        </button>
+
+                        {/* DISARM */}
+                        <button
+                            className="gcs-btn"
+                            style={{ '--acc': '#c0392b' } as React.CSSProperties}
+                            onClick={handleDisarm}
+                        >
+                            <div className="btn-label">DISARM</div>
+                            <div className="btn-sub">SAFE MODE</div>
+                        </button>
+                    </div>
+
+                    {/* Log bar */}
+                    <div className="gcs-log">
+                        <span className="log-ts">{logTs}</span>
+                        <span className="log-txt">// {logMsg}</span>
+                    </div>
+                </div>
             </div>
-        </div>
+        </>
     );
 }
