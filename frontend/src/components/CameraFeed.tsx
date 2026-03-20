@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 import { getRpiWsUrl, getRpiUrl, BACKEND_IP } from "../config";
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap');
 
   .gcs-root {
     position: fixed;
@@ -33,7 +33,7 @@ const styles = `
   }
 
   .gcs-title {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: 'Rajdhani', sans-serif;
     font-size: 28px;
     letter-spacing: 3px;
     color: #dbecf0ff;
@@ -47,7 +47,7 @@ const styles = `
   }
 
   .gcs-stat {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: 'Rajdhani', sans-serif;
     font-size: 14px;
     letter-spacing: 1.5px;
     color: #1d4e5f;
@@ -86,10 +86,71 @@ const styles = `
     width: 100%;
     height: 100%;
     object-fit: cover;
-    position: absolute;
-    inset: 0;
     display: block;
   }
+
+  /* ── Swappable Feed Containers ── */
+  .feed-container {
+    position: absolute;
+    background: #000;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .feed-container.main {
+    inset: 0;
+    z-index: 1;
+  }
+
+  .feed-container.pip {
+    bottom: 10px;
+    right: 10px;
+    width: 28%;
+    aspect-ratio: 16 / 9;
+    border: 1px solid rgba(34,166,192,0.4);
+    border-radius: 4px;
+    z-index: 20;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+  }
+  .feed-container.pip:hover {
+    border-color: #22a6c0;
+    transform: scale(1.02);
+  }
+
+  .feed-tag {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 8px;
+    letter-spacing: 1.5px;
+    color: rgba(34,166,192,0.8);
+    text-transform: uppercase;
+    pointer-events: none;
+    z-index: 5;
+    background: rgba(2,6,23,0.6);
+    padding: 1px 4px;
+    border-radius: 2px;
+  }
+  .feed-container.main .feed-tag {
+    font-size: 10px;
+    top: 10px;
+    left: 26px;
+    background: transparent;
+  }
+
+  .swap-hint {
+    position: absolute;
+    bottom: 6px;
+    right: 8px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 7px;
+    color: rgba(34,166,192,0.5);
+    text-transform: uppercase;
+    display: none;
+  }
+  .feed-container.pip .swap-hint { display: block; }
 
   /* HUD overlays */
   .hud-corner {
@@ -107,7 +168,7 @@ const styles = `
 
   .hud-label {
     position: absolute;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: 'Rajdhani', sans-serif;
     font-size: 9px;
     letter-spacing: 1.5px;
     color: rgba(34,166,192,0.55);
@@ -135,7 +196,7 @@ const styles = `
     align-items: center;
     justify-content: center;
     gap: 6px;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: 'Rajdhani', sans-serif;
     font-size: 10px;
     letter-spacing: 2px;
     color: #1a3040;
@@ -144,6 +205,9 @@ const styles = `
   .no-signal-icon {
     font-size: 28px;
     opacity: 0.15;
+  }
+
+
   }
 
   /* ── Control strip ── */
@@ -210,7 +274,7 @@ const styles = `
   }
 
   .btn-sub {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: 'Rajdhani', sans-serif;
     font-size: 20px;
     letter-spacing: 1px;
     color: var(--acc);
@@ -233,7 +297,7 @@ const styles = `
   }
   .confirm-layer.show { display: flex; }
   .confirm-prompt {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: 'Rajdhani', sans-serif;
     font-size: 20px;
     letter-spacing: 1.5px;
     color: #c0392b;
@@ -260,7 +324,7 @@ const styles = `
     display: flex;
     align-items: center;
     gap: 8px;
-    font-family: 'Share Tech Mono', monospace;
+    font-family: 'Rajdhani', sans-serif;
     font-size: 20px;
     color: #1d4e5f;
     border-top: 1px solid #0f1e28;
@@ -271,12 +335,17 @@ const styles = `
 `;
 
 export function CameraFeed() {
-    const imgRef = useRef<HTMLImageElement>(null);
+    const imgRef    = useRef<HTMLImageElement>(null);
+    const pipImgRef = useRef<HTMLImageElement>(null);
+
     const [armed, setArmed] = useState(false);
     const [status, setStatus] = useState<'ok' | 'armed' | 'airborne'>('ok');
     const [logMsg, setLogMsg] = useState('GCS LINK ESTABLISHED');
     const [logTs, setLogTs] = useState('');
     const [showConfirm, setShowConfirm] = useState(false);
+    const [bsCamActive, setBsCamActive] = useState(false);   // got at least one BS frame
+    const [rpiCamActive, setRpiCamActive] = useState(false); // got at least one RPI frame
+    const [isSwapped, setIsSwapped] = useState(false);       // swap main/pip feeds
 
     const now = () => {
         const d = new Date();
@@ -289,18 +358,64 @@ export function CameraFeed() {
         setLogMsg(msg);
     };
 
+    // ── RPi camera feed (binary WS frames) ─────────────────────────────────
     useEffect(() => {
+        let active = true;
         setLogTs(now());
         const socket = new WebSocket(`${getRpiWsUrl()}/ws/video`);
-        socket.onmessage = (event) => {
+        
+        socket.onmessage = async (event) => {
+            if (!active) return;
+            if (!(event.data instanceof Blob)) return;
+            
+            const buffer = await event.data.arrayBuffer();
+            if (buffer.byteLength < 4) return;
+            
+            const view = new DataView(buffer);
+            const headerLen = view.getUint32(0, true); // true for little-endian
+            const headerEnd = 4 + headerLen;
+            
+            if (buffer.byteLength < headerEnd) return;
+            
+            const jpegBuffer = buffer.slice(headerEnd);
+            const jpegBlob = new Blob([jpegBuffer], { type: 'image/jpeg' });
+            
+            if (!rpiCamActive) setRpiCamActive(true);
+            
             if (imgRef.current) {
-                const blob = new Blob([event.data], { type: 'image/jpeg' });
-                imgRef.current.src = URL.createObjectURL(blob);
+                const url = URL.createObjectURL(jpegBlob);
+                const oldUrl = imgRef.current.src;
+                imgRef.current.src = url;
+                if (oldUrl.startsWith('blob:')) {
+                    URL.revokeObjectURL(oldUrl);
+                }
             }
         };
 
-        return () => socket.close();
+        socket.onopen = () => console.log("RPi Video WS Connected");
+        socket.onerror = (err) => console.error("RPi Video WS Error:", err);
+        socket.onclose = () => console.log("RPi Video WS Closed");
+
+        return () => {
+            active = false;
+            socket.close();
+        };
+    }, []); // Only connect once on mount
+
+    // ── Base-station camera feed (bs:camera_frame custom events) ───────────
+    const onBsFrame = useCallback((e: Event) => {
+        const blob = (e as CustomEvent<Blob>).detail;
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        if (pipImgRef.current) pipImgRef.current.src = url;
+        setBsCamActive(true);
     }, []);
+
+    useEffect(() => {
+        window.addEventListener('bs:camera_frame', onBsFrame);
+        return () => window.removeEventListener('bs:camera_frame', onBsFrame);
+    }, [onBsFrame]);
+
 
     const cmd = async (action: string) => {
         await fetch(`${getRpiUrl()}/${action}`, {
@@ -368,14 +483,47 @@ export function CameraFeed() {
 
                 {/* Camera feed */}
                 <div className="gcs-feed">
-                    <img ref={imgRef} alt="RPi Camera Stream" />
+                    {/* Primary Feed (Drone RPi) */}
+                    <div 
+                        className={`feed-container ${isSwapped ? 'pip' : 'main'}`}
+                        onClick={isSwapped ? () => setIsSwapped(false) : undefined}
+                    >
+                        <img 
+                            ref={imgRef} 
+                            alt="RPi Camera Feed" 
+                            style={{ display: rpiCamActive ? 'block' : 'none' }} 
+                        />
+                        {!rpiCamActive && (
+                            <div className="no-signal">
+                                <div className="no-signal-icon">⊘</div>
+                                CAM-01 NO SIGNAL
+                            </div>
+                        )}
+                        <span className="feed-tag">CAM-01 / RGB</span>
+                        <span className="swap-hint">⇋ SWAP</span>
+                    </div>
 
-                    {/* HUD overlays */}
+                    {/* Secondary Feed (Base Station) */}
+                    <div 
+                        className={`feed-container ${!isSwapped ? 'pip' : 'main'}`}
+                        onClick={!isSwapped ? () => setIsSwapped(true) : undefined}
+                    >
+                        {bsCamActive 
+                            ? <img ref={pipImgRef} alt="Base Station Feed" />
+                            : <div className="no-signal">
+                                <div className="no-signal-icon">⊘</div>
+                                CAM-02 NO SIGNAL
+                              </div>
+                        }
+                        <span className="feed-tag">CAM-02 / BASE</span>
+                        <span className="swap-hint">⇋ SWAP</span>
+                    </div>
+
+                    {/* Static HUD overlays */}
                     <div className="hud-corner tl" />
                     <div className="hud-corner tr" />
                     <div className="hud-corner bl" />
                     <div className="hud-corner br" />
-                    <div className="hud-label tl">CAM-01 / RGB</div>
                     <div className="hud-label br">REC ● LIVE</div>
 
                     <div className="hud-crosshair">
@@ -386,11 +534,6 @@ export function CameraFeed() {
                             <line x1="15" y1="12" x2="24" y2="12" />
                             <circle cx="12" cy="12" r="3" />
                         </svg>
-                    </div>
-
-                    <div className="no-signal">
-                        <div className="no-signal-icon">⊘</div>
-                        NO SIGNAL
                     </div>
                 </div>
 

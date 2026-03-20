@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import CockpitDashboard from "./components/dashboard";
 import { io } from "socket.io-client";
 import { getWsUrl, getBaseUrl } from "./config";
+import { initBaseStationWS } from "./useBaseStationWS";
+
+// Start base station WebSocket singleton (handles arduino_data + camera feed)
+initBaseStationWS();
 
 // Global WebSocket connection for sending commands (like takeoff)
 const socket = io(getWsUrl());

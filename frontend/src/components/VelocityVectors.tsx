@@ -16,9 +16,12 @@ export const VelocityVectors: React.FC<VelocityVectorsProps> = ({ vx = 0, vy = 0
     let angle = Math.atan2(vy, vx) * (180 / Math.PI) - 90;
 
     if (position === 'left') {
-        // For the left gauge (Vertical Velocity):
-        // If vz is positive, point UP (but since it's inverted, we swap the angles)
-        angle = vz >= 0 ? 90 : -90;
+        // NED convention: positive vz = descending, negative vz = ascending
+        // Arrow points DOWN when descending (vz > 0), UP when ascending (vz < 0)
+        angle = vz > 0 ? 90 : -90;
+    } else {
+        // Right gauge (Vh): invert arrow direction when descending (vz > 0)
+        if (vz > 0) angle += 180;
     }
 
     // The length of the arrow should map to Vmax, scaling as it increases/decreases

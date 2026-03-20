@@ -4,9 +4,9 @@ body {
   margin: 0;
   background: radial-gradient(circle at center, #020617 0%, #000 100%);
   color: var(--text);
-  font-family: "JetBrains Mono", monospace;
+  font-family: "Rajdhani", sans-serif;
   font-size: 20px;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.05em;
 
   display: flex;
   flex-direction: column;
@@ -177,7 +177,7 @@ body {
   color: white;
   font-size: 1.8rem;
   font-weight: bold;
-  font-family: 'Trebuchet MS';
+  font-family: 'Rajdhani', sans-serif;
   border-bottom: 2px solid #bfc5d3;
   padding-bottom: 8px;
   margin-bottom: 8px;

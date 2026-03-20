@@ -9,72 +9,75 @@ from typing import Optional
 from pymavlink import mavutil
 from threading import Lock
 import datetime
-import serial
 import threading
+import asyncio
+import websockets
 
-ARDUINO_PORT = "COM15"
+# Arduino data now arrives via WebSocket (base station) — serial port not needed
+
+# BASE STATION (sender machine — JSON events + camera feed on same WS)
+BS_WS_URI = "ws://192.168.0.42:8765"
 
 # Absolute path to the project root (where listen.py lives)
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_STATION_JSON = os.path.join(_BASE_DIR, "public", "params", "BASE_STATION_DATA.json")
-ARDUINO_BAUD = 9600
 
 arduino_lock = Lock()
 arduino_data = {"raw": "No data yet"}
 arduino_ser = None
 
-def read_arduino_thread():
-    global arduino_ser
-    try:
-        arduino_ser = serial.Serial(ARDUINO_PORT, ARDUINO_BAUD, timeout=1)
-        time.sleep(2)
-        print(f"Arduino connected on {ARDUINO_PORT}")
-    except serial.SerialException as e:
-        print(f"Arduino connection error: {e}")
-        return
+async def arduino_ws_listener():
+    """Async loop to listen for Arduino data from the base station WebSocket."""
+    global arduino_data
     while True:
         try:
-            if arduino_ser and arduino_ser.in_waiting > 0:
-                line = arduino_ser.readline().decode('utf-8', errors='replace').strip()
-                if line:
-                    with arduino_lock:
-                        arduino_data["raw"] = line
-                    # Inline parse and write to BASE_STATION_DATA.json
+            print(f"[BS-WS-BACKEND] Connecting to {BS_WS_URI} ...")
+            async with websockets.connect(BS_WS_URI, ping_interval=20, ping_timeout=10) as ws:
+                print(f"[BS-WS-BACKEND] Connected successfully.")
+                async for raw_message in ws:
                     try:
-                        relay_m  = re.search(r'Relay:\s*(\w+)', line)
-                        ca0_m    = re.search(r'Current A0:\s*([\d.]+)\s*A', line)
-                        ca1_m    = re.search(r'Current A1:\s*([\d.]+)\s*A', line)
-                        vs1_m    = re.search(r'Voltage S1:\s*([\d.]+)\s*V', line)
-                        vs2_m    = re.search(r'Voltage S2:\s*([\d.]+)\s*V', line)
-                        parsed = {
-                            "relay":      relay_m.group(1).upper() if relay_m else "UNKNOWN",
-                            "currentA0":  float(ca0_m.group(1))   if ca0_m  else 0.0,
-                            "currentA1":  float(ca1_m.group(1))   if ca1_m  else 0.0,
-                            "voltageS1":  float(vs1_m.group(1))   if vs1_m  else 0.0,
-                            "voltageS2":  float(vs2_m.group(1))   if vs2_m  else 0.0,
-                            "raw": line
-                        }
-                        with open(BASE_STATION_JSON, "w") as f:
-                            json.dump(parsed, f, indent=4)
-                    except Exception as ex:
-                        print(f"[Arduino] JSON write error: {ex}")
-        except serial.SerialException as e:
-            print(f"[Arduino] Read Error:{e}")
-            break
-        time.sleep(0.01)
+                        if isinstance(raw_message, bytes):
+                            continue # Ignore binary camera frames
+                            
+                        data = json.loads(raw_message)
+                        if data.get("event") == "arduino_data":
+                            # 1. Update internal state (for /telemetry API)
+                            with arduino_lock:
+                                arduino_data["raw"] = raw_message
+                            
+                            # 2. Extract and write to JSON file (for CSV logger)
+                            parsed = {
+                                "relay":      data.get("relay",      "UNKNOWN").upper() if data.get("relay") else "UNKNOWN",
+                                "currentA0":  float(data.get("current_A0", 0.0)),
+                                "currentA1":  float(data.get("current_A1", 0.0)),
+                                "voltageS1":  float(data.get("voltage_S1", 0.0)),
+                                "voltageS2":  float(data.get("voltage_S2", 0.0)),
+                                "raw":        raw_message
+                            }
+                            # Atomic-ish write
+                            try:
+                                with open(BASE_STATION_JSON, "w") as f:
+                                    json.dump(parsed, f, indent=4)
+                            except Exception as ex:
+                                print(f"[Arduino] JSON write error: {ex}")
+                    except json.JSONDecodeError:
+                        pass
+                    except Exception as e:
+                        print(f"[BS-WS-BACKEND] Msg handle error: {e}")
+        except Exception as e:
+            print(f"[BS-WS-BACKEND] Connection error: {e}. Retrying in 5s ...")
+            await asyncio.sleep(5)
+
+def read_arduino_thread():
+    """Entry point to run the async WS listener in a background thread."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(arduino_ws_listener())
 
 def send_arduino_cmd(cmd: str) -> bool:
-    """Send a command (like 'on\\n' or 'off\\n') to the Arduino."""
-    global arduino_ser
-    if arduino_ser and arduino_ser.is_open:
-        try:
-            # Ensure the command ends with a newline as Arduino usually expects it
-            if not cmd.endswith('\n'):
-                cmd += '\n'
-            arduino_ser.write(cmd.encode('utf-8'))
-            return True
-        except Exception as e:
-            print(f"[Arduino] Write Error: {e}")
+    """No-op — relay commands should be sent via WebSocket if needed, 
+       but currently only receiving data. Keeping for API compatibility."""
+    print(f"[BS-WS-BACKEND] send_arduino_cmd called with '{cmd}' — local serial not used.")
     return False
 
 def get_arduino_data():
@@ -286,6 +289,7 @@ def trigger_takeoff(altitude=10.0):
 
 def main():
     global global_master
+    # Arduino data thread (WebSocket receiver)
     threading.Thread(target=read_arduino_thread, daemon=True).start()
     print(f"Attempting to connect to MAVLink hardware on {COM_PORT}...")
     while True:

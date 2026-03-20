@@ -5,14 +5,14 @@ const MISSION_DURATION = 8 * 60; // 8 minutes in seconds
 
 /* ─── Styles ─────────────────────────────────────────────────────────────── */
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap');
 
   .mdp-root {
     position: fixed;
     right: 0;
     top: 1.5%;
-    width: 30%;
-    height: 93%;
+    width: 29%;
+    height: 23%;
     z-index: 50;
     display: flex;
     flex-direction: column;
@@ -20,9 +20,8 @@ const styles = `
     border: 1px solid #1a3040;
     border-radius: 8px 0 0 8px;
     box-shadow: 0 0 0 1px #0d1f2d, -8px 0 40px rgba(0,0,0,0.6);
-    font-family: 'Share Tech Mono', monospace;
+    font-family: 'Rajdhani', sans-serif;
     overflow: hidden;
-  }
 
   /* ── Header ── */
   .mdp-header {
@@ -35,8 +34,9 @@ const styles = `
     flex-shrink: 0;
   }
   .mdp-title {
-    font-size: 22px;
+    font-size: 28px;
     letter-spacing: 3px;
+    align-items: center;
     color: #dbecf0;
     text-transform: uppercase;
   }
@@ -70,7 +70,7 @@ const styles = `
     text-transform: uppercase;
   }
   .mdp-timer-display {
-    font-family: 'Share Tech Mono', monospace;
+    font-family: 'Rajdhani', sans-serif;
     font-size: 64px;
     letter-spacing: 6px;
     transition: color 0.4s;
@@ -539,7 +539,7 @@ export function MissionDataPanel() {
 
         {/* Header */}
         <div className="mdp-header">
-          <div className="mdp-title">DATA TRANSFER</div>
+          <div className="mdp-title">MISSION TIMER</div>
           <div className={`mdp-badge ${badgeCls}`}>{badgeLabel}</div>
         </div>
 

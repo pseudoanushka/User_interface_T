@@ -1,25 +1,24 @@
 import { useEffect, useState } from 'react';
 
-import { getBaseUrl } from "../config";
 const MAX_CURRENT = 4.0;
 const MIN_VOLTAGE = 12.0;
 const MAX_VOLTAGE = 16.5;
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;600;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap');
 
   .csp-root {
     position: fixed;
     left: 40%;
     top: calc(3.5% + 68% + 10px);
     width: 30%;
-    height: 25%;
+    height: 27.5%;
     z-index: 50;
     background: #020617;
     border: 1px solid #1a3040;
     border-radius: 0 0 8px 8px;
     box-shadow: 0 0 0 1px #0d1f2d, 0 8px 40px rgba(0,0,0,0.7);
-    font-family: 'Share Tech Mono', monospace;
+    font-family: 'Rajdhani', sans-serif;
     overflow: hidden;
   }
 
@@ -259,17 +258,19 @@ export function ChargingStatusPanel() {
   });
 
   useEffect(() => {
-    const poll = async () => {
-      try {
-        const response = await fetch(`${getBaseUrl()}/telemetry`);
-        const json = await response.json();
-        const a = json?.ARDUINO;
-        if (a) setData(a);
-      } catch { /* ignore */ }
+    const onArduinoData = (e: Event) => {
+      const d = (e as CustomEvent).detail;
+      if (!d) return;
+      setData({
+        relay:      d.relay      ?? 'UNKNOWN',
+        currentA0:  d.current_A0 ?? 0,
+        currentA1:  d.current_A1 ?? 0,
+        voltageS1:  d.voltage_S1 ?? 0,
+        voltageS2:  d.voltage_S2 ?? 0,
+      });
     };
-    poll();
-    const id = setInterval(poll, 1000);
-    return () => clearInterval(id);
+    window.addEventListener('bs:arduino_data', onArduinoData);
+    return () => window.removeEventListener('bs:arduino_data', onArduinoData);
   }, []);
 
   const relaying = data.relay === 'ON';
