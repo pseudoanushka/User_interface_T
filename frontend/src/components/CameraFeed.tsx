@@ -210,8 +210,73 @@ const styles = `
     opacity: 0.15;
   }
 
-
-
+  /* ── Overlay Controls ── */
+  .feed-overlay-controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 140px;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    background: rgba(2, 6, 23, 0.6);
+    border: 1px solid rgba(34, 166, 192, 0.3);
+    border-radius: 4px;
+    padding: 8px 6px;
+    backdrop-filter: blur(2px);
+    pointer-events: auto;
+  }
+  .overlay-btn-group {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+  }
+  .overlay-btn {
+    flex: 1;
+    background: rgba(34, 166, 192, 0.1);
+    border: 1px solid rgba(34, 166, 192, 0.3);
+    color: #dbecf0;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 11px;
+    padding: 6px 0;
+    cursor: pointer;
+    border-radius: 2px;
+    text-transform: uppercase;
+    transition: all 0.2s;
+    font-weight: 600;
+    text-align: center;
+  }
+  .overlay-btn:hover {
+    background: rgba(34, 166, 192, 0.4);
+    border-color: #22a6c0;
+  }
+  .overlay-btn:active {
+    transform: scale(0.95);
+  }
+  .overlay-btn.danger {
+    background: rgba(192, 57, 43, 0.15);
+    border-color: rgba(192, 57, 43, 0.4);
+    color: #e74c3c;
+  }
+  .overlay-btn.danger:hover {
+    background: rgba(192, 57, 43, 0.4);
+    border-color: #c0392b;
+  }
+  .overlay-label {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 9px;
+    color: rgba(34, 166, 192, 0.8);
+    text-align: center;
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+    border-bottom: 1px solid rgba(34, 166, 192, 0.2);
+    padding-bottom: 2px;
+  }
+  .overlay-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
 
   /* ── Control strip ── */
   .gcs-controls {
@@ -428,6 +493,11 @@ export function CameraFeed() {
             .catch(() => alert('Connection to RPi Failed'));
     };
 
+    const cmdAction = (action: string, displayName: string) => {
+        cmd(action);
+        log(`CMD: ${displayName}`);
+    };
+
     const handleArm = () => { if (!armed) setShowConfirm(true); };
 
     const doArm = (e: React.MouseEvent) => {
@@ -540,6 +610,37 @@ export function CameraFeed() {
                             <line x1="15" y1="12" x2="24" y2="12" />
                             <circle cx="12" cy="12" r="3" />
                         </svg>
+                    </div>
+
+                    {/* Additional RPi Functions Overlay */}
+                    <div className="feed-overlay-controls">
+                        <div className="overlay-label">FLIGHT MODES</div>
+                        <div className="overlay-btn-group">
+                            <button className="overlay-btn" onClick={() => cmdAction('auto', 'AUTO ALIGN')}>AUTO</button>
+                            <button className="overlay-btn" onClick={() => cmdAction('cancel', 'CANCEL AUTO')}>CANCEL</button>
+                            <button className="overlay-btn danger" onClick={() => cmdAction('kill', 'KILL SWITCH')}>KILL</button>
+                        </div>
+                        
+                        <div className="overlay-label" style={{marginTop: '6px'}}>RECORDING</div>
+                        <div className="overlay-btn-group">
+                            <button className="overlay-btn" onClick={() => cmdAction('start_recording', 'REC START')}>ON</button>
+                            <button className="overlay-btn" onClick={() => cmdAction('stop_recording', 'REC STOP')}>OFF</button>
+                        </div>
+
+                        <div className="overlay-label" style={{marginTop: '6px'}}>NUDGE & YAW</div>
+                        <div className="overlay-grid">
+                            <button className="overlay-btn" onClick={() => cmdAction('yaw/l', 'YAW LEFT')}>↶</button>
+                            <button className="overlay-btn" onClick={() => cmdAction('nudge/w', 'NUDGE FWD')}>W</button>
+                            <button className="overlay-btn" onClick={() => cmdAction('yaw/r', 'YAW RIGHT')}>↷</button>
+                            
+                            <button className="overlay-btn" onClick={() => cmdAction('nudge/a', 'NUDGE LEFT')}>A</button>
+                            <button className="overlay-btn" onClick={() => cmdAction('recenter', 'RECENTER')}>●</button>
+                            <button className="overlay-btn" onClick={() => cmdAction('nudge/d', 'NUDGE RIGHT')}>D</button>
+                            
+                            <button className="overlay-btn" onClick={() => cmdAction('nudge/dn', 'NUDGE DOWN')}>▼</button>
+                            <button className="overlay-btn" onClick={() => cmdAction('nudge/s', 'NUDGE BWD')}>S</button>
+                            <button className="overlay-btn" onClick={() => cmdAction('nudge/up', 'NUDGE UP')}>▲</button>
+                        </div>
                     </div>
                 </div>
 
