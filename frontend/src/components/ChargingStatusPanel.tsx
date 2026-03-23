@@ -32,10 +32,14 @@ const styles = `
   }
 
   .csp-title {
-    font-size: 28px;
-    letter-spacing: 3px;
+    font-size: clamp(14px, 1.3vw, 24px);
+    letter-spacing: 2px;
     color: #e7edeeff;
     text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: -2px;
   }
 
   .csp-relay-badge {
@@ -70,6 +74,7 @@ const styles = `
     display: flex;
     flex-direction: column;
     align-items: center;
+    top: 1.5%
     justify-content: center;
     text-align: center;
     gap: 4px;

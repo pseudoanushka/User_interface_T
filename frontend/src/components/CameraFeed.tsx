@@ -34,10 +34,13 @@ const styles = `
 
   .gcs-title {
     font-family: 'Rajdhani', sans-serif;
-    font-size: 28px;
-    letter-spacing: 3px;
+    font-size: clamp(16px, 1.5vw, 28px);
+    letter-spacing: 2px;
     color: #dbecf0ff;
     text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .gcs-meta {
@@ -208,7 +211,7 @@ const styles = `
   }
 
 
-  }
+
 
   /* ── Control strip ── */
   .gcs-controls {
@@ -266,16 +269,16 @@ const styles = `
   }
 
   .btn-label {
-    font-size: 25px;
+    font-size: clamp(14px, 1.3vw, 25px);
     font-weight: 700;
-    letter-spacing: 2.5px;
+    letter-spacing: 2px;
     color: #b0bec8;
     text-transform: uppercase;
   }
 
   .btn-sub {
     font-family: 'Rajdhani', sans-serif;
-    font-size: 20px;
+    font-size: clamp(10px, 1vw, 20px);
     letter-spacing: 1px;
     color: var(--acc);
     opacity: 0.6;
@@ -446,12 +449,14 @@ export function CameraFeed() {
         setStatus('airborne');
         log('TAKEOFF initiated — climbing to altitude');
         cmd('takeoff');
+        window.dispatchEvent(new Event('mission:start'));
     };
 
     const handleLand = () => {
         setStatus('ok');
         log('LAND initiated — auto-descent active');
         cmd('land');
+        window.dispatchEvent(new Event('mission:stop'));
     };
 
     const handleDisarm = () => {
@@ -459,6 +464,7 @@ export function CameraFeed() {
         setStatus('ok');
         log('DISARMED — motors disabled');
         cmd('disarm');
+        window.dispatchEvent(new Event('mission:stop'));
     };
 
     const statusLabels = { ok: 'STANDBY', armed: 'ARMED', airborne: 'AIRBORNE' };

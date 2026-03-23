@@ -43,9 +43,8 @@ body {
 /* =============================== MAIN GRID =============================== */
 
 .cockpit-container {
-  width: 50vw;
-  min-width: 850px;
-  max-width: 1000px;
+  width: 40vw;
+  max-width: 40vw;
   height: 100vh;
   margin: 0;
   border: none;
@@ -323,7 +322,7 @@ canvas {
 
 .tpanel-label {
   color: #64748b;
-  font-size: 2 rem;
+  font-size: 2rem;
 }
 
 .tpanel-val-green {

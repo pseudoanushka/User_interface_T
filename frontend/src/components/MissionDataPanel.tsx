@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 import { getBaseUrl } from "../config";
-const MISSION_DURATION = 8 * 60; // 8 minutes in seconds
 
 /* ─── Styles ─────────────────────────────────────────────────────────────── */
 const styles = `
@@ -10,40 +9,49 @@ const styles = `
   .mdp-root {
     position: fixed;
     right: 0;
-    top: 1.5%;
+    top: 35%;
     width: 29%;
-    height: 23%;
+    height: 25%;
     z-index: 50;
     display: flex;
     flex-direction: column;
+    align-items: center;
     background: #020617;
     border: 1px solid #1a3040;
     border-radius: 8px 0 0 8px;
     box-shadow: 0 0 0 1px #0d1f2d, -8px 0 40px rgba(0,0,0,0.6);
     font-family: 'Rajdhani', sans-serif;
     overflow: hidden;
+    padding-bottom: 8px;
+  }
 
   /* ── Header ── */
   .mdp-header {
-    background: #020617;
+    width: 100%;
+    background: #000;
     border-bottom: 1px solid #1a3040;
-    padding: 7px 12px;
+    padding: 8px 12px;
     display: flex;
+    flex-direction: row;
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
   }
   .mdp-title {
-    font-size: 28px;
-    letter-spacing: 3px;
+    font-size: 40px;
+    font-weight: bold;
+    letter-spacing: 2px;
     align-items: center;
-    color: #dbecf0;
+    color: #ffffff;
     text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .mdp-badge {
-    font-size: 13px;
-    letter-spacing: 2px;
-    padding: 2px 8px;
+    font-size: 30px;
+    letter-spacing: 1px;
+    padding: 2px 6px;
     border-radius: 2px;
     text-transform: uppercase;
     transition: all 0.3s;
@@ -55,46 +63,48 @@ const styles = `
 
   /* ── Timer block ── */
   .mdp-timer-block {
-    padding: 14px 12px 10px;
+    padding: 12px;
+    width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
-    border-bottom: 1px solid #0f1e28;
+    gap: 6px;
     flex-shrink: 0;
   }
   .mdp-timer-label {
-    font-size: 12px;
-    letter-spacing: 3px;
-    color: #1d4e5f;
+    font-size: 30px;
+    letter-spacing: 1px;
+    color: #ffffff;
     text-transform: uppercase;
+    white-space: nowrap;
   }
   .mdp-timer-display {
     font-family: 'Rajdhani', sans-serif;
-    font-size: 64px;
-    letter-spacing: 6px;
+    font-size: 32px;
+    font-weight: bold;
+    letter-spacing: 4px;
     transition: color 0.4s;
     line-height: 1;
   }
-  .mdp-timer-ok      { color: #22a6c0; }
-  .mdp-timer-low     { color: #e67e22; }
-  .mdp-timer-critical{ color: #c0392b; animation: mdp-blink 0.6s step-start infinite; }
-  .mdp-timer-stopped { color: #1d4e5f; }
+  .mdp-timer-ok      { color: #ef4444; }
+  .mdp-timer-low     { color: #ef4444; }
+  .mdp-timer-critical{ color: #ef4444; animation: mdp-blink 0.6s step-start infinite; }
+  .mdp-timer-stopped { color: #ef4444; opacity: 0.8; }
 
   .mdp-btn-row {
     display: flex;
-    gap: 12px;
+    gap: 8px;
     width: 100%;
   }
   .mdp-btn {
     flex: 1;
-    padding: 10px 0;
-    border-radius: 4px;
+    padding: 4px 0;
+    border-radius: 2px;
     border: 1px solid;
     font-family: 'Rajdhani', sans-serif;
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: 3px;
+    font-size: 30px;
+    font-weight: bold;
+    letter-spacing: 2px;
     text-transform: uppercase;
     cursor: pointer;
     transition: all 0.15s;
@@ -140,12 +150,12 @@ const styles = `
     gap: 2px;
   }
   .mdp-stat-val {
-    font-size: 22px;
+    font-size: 30px;
     letter-spacing: 1px;
     color: #22a6c0;
   }
   .mdp-stat-key {
-    font-size: 10px;
+    font-size: 30px;
     letter-spacing: 2px;
     color: #1d4e5f;
     text-transform: uppercase;
@@ -185,18 +195,18 @@ const styles = `
     opacity: 0.5;
   }
   .mdp-metric-key {
-    font-size: 10px;
+    font-size: 30px;
     letter-spacing: 2px;
     color: #1d4e5f;
     text-transform: uppercase;
   }
   .mdp-metric-val {
-    font-size: 22px;
+    font-size: 30px;
     letter-spacing: 1.5px;
     color: var(--mc, #22a6c0);
   }
   .mdp-metric-unit {
-    font-size: 11px;
+    font-size: 30px;
     color: #1d4e5f;
     letter-spacing: 1px;
   }
@@ -218,13 +228,13 @@ const styles = `
     border-bottom: 1px solid #0f1e28;
   }
   .mdp-log-title {
-    font-size: 13px;
+    font-size: 30px;
     letter-spacing: 3px;
     color: #1d4e5f;
     text-transform: uppercase;
   }
   .mdp-csv-path {
-    font-size: 10px;
+    font-size: 30px;
     letter-spacing: 1px;
     color: #27ae60;
     max-width: 60%;
@@ -248,7 +258,7 @@ const styles = `
     width: max-content;
     min-width: 100%;
     border-collapse: collapse;
-    font-size: 11px;
+    font-size: 30px;
     letter-spacing: 0.5px;
   }
   .mdp-log-table th {
@@ -257,7 +267,7 @@ const styles = `
     background: #040c14;
     color: #1d4e5f;
     text-transform: uppercase;
-    font-size: 9px;
+    font-size: 30px;
     letter-spacing: 1.5px;
     padding: 5px 8px;
     border-bottom: 1px solid #0f1e28;
@@ -281,11 +291,11 @@ const styles = `
     justify-content: center;
     gap: 8px;
     color: #1a3040;
-    font-size: 12px;
+    font-size: 30px;
     letter-spacing: 2px;
     text-transform: uppercase;
   }
-  .mdp-log-empty-icon { font-size: 28px; opacity: 0.15; }
+  .mdp-log-empty-icon { font-size: 30px; opacity: 0.15; }
 
   /* ── Ticker at very bottom ── */
   .mdp-ticker {
@@ -295,7 +305,7 @@ const styles = `
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 11px;
+    font-size: 30px;
     color: #1d4e5f;
     letter-spacing: 1px;
   }
@@ -339,7 +349,7 @@ const TABLE_COLS = [
 /* ─── Component ─────────────────────────────────────────────────────────── */
 export function MissionDataPanel() {
   const [state, setState] = useState<MissionState>('idle');
-  const [remaining, setRemaining] = useState(MISSION_DURATION);
+  const [timerValue, setTimerValue] = useState(0);
   const [rowsLogged, setRowsLogged] = useState(0);
   const [framesSaved, setFramesSaved] = useState(0);
   const [csvPath, setCsvPath] = useState('');
@@ -386,8 +396,6 @@ export function MissionDataPanel() {
   /* ── Timer class ── */
   const timerClass = () => {
     if (state === 'stopped') return 'mdp-timer-stopped';
-    if (remaining <= 30) return 'mdp-timer-critical';
-    if (remaining <= 60) return 'mdp-timer-low';
     return 'mdp-timer-ok';
   };
 
@@ -404,7 +412,7 @@ export function MissionDataPanel() {
     } catch { /* server may be stopping */ }
 
     setState('running');
-    setRemaining(MISSION_DURATION);
+    setTimerValue(0);
     setRowsLogged(0);
     setFramesSaved(0);
     setCsvPath('');
@@ -414,22 +422,17 @@ export function MissionDataPanel() {
     // ── Smooth wall-clock countdown via requestAnimationFrame ──
     // Only calls setState when the displayed second actually changes → no flicker
     startTimeRef.current = Date.now();
-    lastSecRef.current = MISSION_DURATION;
+    lastSecRef.current = 0;
     isRunningRef.current = true;
 
     const tick = () => {
       if (!isRunningRef.current) return; // Exit loop if stopped
 
       const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-      const left = Math.max(0, MISSION_DURATION - elapsed);
 
-      if (left !== lastSecRef.current) {
-        lastSecRef.current = left;
-        setRemaining(left);
-        if (left === 0) {
-          handleStop();
-          return;
-        }
+      if (elapsed !== lastSecRef.current) {
+        lastSecRef.current = elapsed;
+        setTimerValue(elapsed);
       }
       timerRafRef.current = requestAnimationFrame(tick);
     };
@@ -463,18 +466,30 @@ export function MissionDataPanel() {
 
   }, []); // eslint-disable-line
 
-  /* ── Capture a frame from the camera and POST to backend ── */
+  /* ── Capture an extreme-low-quality frame from the RPi feed ── */
+  const FRAME_W = 160;   // tiny thumbnail width
+  const FRAME_H = 120;   // tiny thumbnail height
+  const FRAME_Q = 0.15;  // JPEG quality (0.0–1.0) — extreme low for minimal storage
+
   const captureFrame = () => {
-    // We use a hidden canvas to grab the img element drawn in CameraFeed
+    // Grab the first visible img inside the camera feed area
     const camImg = document.querySelector('.gcs-feed img') as HTMLImageElement | null;
-    if (!camImg || !camImg.src || camImg.src.startsWith('data:') === false && camImg.naturalWidth === 0) return;
+    if (!camImg || !camImg.src) return;
+
+    // RPi feed uses blob: URLs, BS feed may too — accept both blob: and data:
+    const hasSrc = camImg.src.startsWith('blob:') || camImg.src.startsWith('data:');
+    if (!hasSrc && camImg.naturalWidth === 0) return;
+
     try {
       const canvas = document.createElement('canvas');
-      canvas.width = camImg.naturalWidth || 320;
-      canvas.height = camImg.naturalHeight || 240;
+      canvas.width  = FRAME_W;
+      canvas.height = FRAME_H;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      ctx.drawImage(camImg, 0, 0);
+
+      // Scale the full-res image down to the tiny canvas
+      ctx.drawImage(camImg, 0, 0, FRAME_W, FRAME_H);
+
       canvas.toBlob(blob => {
         if (!blob) return;
         fetch(`${getBaseUrl()}/mission/save_frame`, {
@@ -482,7 +497,7 @@ export function MissionDataPanel() {
           body: blob,
           headers: { 'Content-Type': 'image/jpeg' }
         }).catch(() => { /* ignore */ });
-      }, 'image/jpeg', 0.85);
+      }, 'image/jpeg', FRAME_Q);
     } catch { /* cross-origin frames may block canvas taint */ }
   };
 
@@ -528,6 +543,22 @@ export function MissionDataPanel() {
     if (frameTimerRef.current) clearInterval(frameTimerRef.current);
   }, []);
 
+  /* ── Event listeners for external start/stop triggers ── */
+  useEffect(() => {
+    const onMissionStart = () => {
+      document.getElementById('mission-start-btn')?.click();
+    };
+    const onMissionStop = () => {
+      document.getElementById('mission-stop-btn')?.click();
+    };
+    window.addEventListener('mission:start', onMissionStart);
+    window.addEventListener('mission:stop', onMissionStop);
+    return () => {
+      window.removeEventListener('mission:start', onMissionStart);
+      window.removeEventListener('mission:stop', onMissionStop);
+    };
+  }, []);
+
   /* ─── Render ─────────────────────────────────────────────────────────── */
   const badgeCls = state === 'idle' ? 'mdp-badge-idle' : state === 'running' ? 'mdp-badge-running' : 'mdp-badge-stopped';
   const badgeLabel = state === 'idle' ? 'STANDBY' : state === 'running' ? '● RECORDING' : 'MISSION COMPLETE';
@@ -545,8 +576,8 @@ export function MissionDataPanel() {
 
         {/* Mission Timer */}
         <div className="mdp-timer-block">
-          <div className="mdp-timer-label">MISSION TIMER — MAX 08:00</div>
-          <div className={`mdp-timer-display ${timerClass()}`}>{fmt(remaining)}</div>
+          <div className="mdp-timer-label">MISSION STOPWATCH</div>
+          <div className={`mdp-timer-display ${timerClass()}`}>{fmt(timerValue)}</div>
           <div className="mdp-btn-row">
             <button
               id="mission-start-btn"

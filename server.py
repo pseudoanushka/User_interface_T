@@ -319,7 +319,7 @@ if __name__ == "__main__":
             if "10048" in str(e) or "address" in str(e).lower():
                 print(f"\n[server] Port {PORT} is already in use (attempt {attempt+1}/5). "
                       f"Waiting 8 seconds for it to free up...\n"
-                      f"  → To fix immediately: close any other terminal running this server,\n"
+                      f"  -> To fix immediately: close any other terminal running this server,\n"
                       f"    or run:  Stop-Process -Name python* -Force\n")
                 time.sleep(8)
             else:

@@ -1,8 +1,8 @@
 {
     "relay": "ON",
     "currentA0": 0.0,
-    "currentA1": 0.0,
+    "currentA1": 0.12,
     "voltageS1": 0.0,
     "voltageS2": 0.0,
-    "raw": "{\"event\": \"arduino_data\", \"timestamp\": 1773969970.0178587, \"relay\": \"ON\", \"current_A0\": 0.0, \"current_A1\": 0.0, \"voltage_S1\": 0.0, \"voltage_S2\": 0.0}"
+    "raw": "{\"event\": \"arduino_data\", \"timestamp\": 1774100043.5741034, \"relay\": \"ON\", \"current_A0\": 0.0, \"current_A1\": 0.12, \"voltage_S1\": 0.0, \"voltage_S2\": 0.0}"
 }

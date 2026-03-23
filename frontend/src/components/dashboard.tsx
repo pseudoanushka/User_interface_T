@@ -6,6 +6,8 @@ import { VelocityVectors } from "./VelocityVectors";
 import { CameraFeed } from "./CameraFeed";
 import { ChargingStatusPanel } from "./ChargingStatusPanel";
 import { MissionDataPanel } from "./MissionDataPanel";
+import { FailsafePanel } from "./FailsafePanel";
+import titansLogo from "./Titans_logo_white.png";
 
 interface TelemetryData {
   position: { x: number; y: number; z: number };
@@ -25,7 +27,27 @@ export default function CockpitDashboard({ data }: { data: TelemetryData }) {
     <>
       <CameraFeed />
       <ChargingStatusPanel />
+      
+      {/* Logos & Overlays in remaining 1/3 viewport space */}
+      <div style={{
+          position: 'fixed',
+          right: 0,
+          top: '2%',
+          width: '29%',
+          height: '30%',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 50
+      }}>
+        <img src={titansLogo} alt="Titans Logo" style={{ maxWidth: '85%', maxHeight: '85%', objectFit: 'contain', opacity: 0.95 }} />
+      </div>
+
       <MissionDataPanel />
+      
+      {/* Bottom failsafe panel */}
+      <FailsafePanel />
+
       <div className="cockpit-container">
         <div className="cockpit-grid">
           <div className="attitude-container">

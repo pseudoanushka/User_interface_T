@@ -1,9 +1,9 @@
 {
     "mavpackettype": "HEARTBEAT",
-    "type": 6,
-    "autopilot": 8,
-    "base_mode": 0,
-    "custom_mode": 0,
-    "system_status": 0,
+    "type": 2,
+    "autopilot": 12,
+    "base_mode": 81,
+    "custom_mode": 196608,
+    "system_status": 8,
     "mavlink_version": 3
 }
