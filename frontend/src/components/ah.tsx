@@ -4,10 +4,11 @@ interface ArtificialHorizonProps {
   pitch: number;
   roll: number;
   yaw: number;
+  dronePhase?: string;
   children?: React.ReactNode;
 }
 
-export function ArtificialHorizon({ pitch, roll, yaw, children }: ArtificialHorizonProps) {
+export function ArtificialHorizon({ pitch, roll, yaw, dronePhase = 'STANDBY', children }: ArtificialHorizonProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -207,6 +208,24 @@ export function ArtificialHorizon({ pitch, roll, yaw, children }: ArtificialHori
 
   }, [pitch, roll, yaw]);
 
+  // Phase → color mapping
+  const phaseColor: Record<string, string> = {
+    'STANDBY':       '#475569',
+    'ARMED':         '#f59e0b',
+    'AIRBORNE':      '#22a6c0',
+    'PT-ALIGNING':   '#60a5fa',
+    'PT-CLIMBING':   '#34d399',
+    'PT-HOVERING':   '#a78bfa',
+    'PT-AUTOLAND':   '#f97316',
+    'ALIGNING':      '#60a5fa',
+    'DESCENDING':    '#f97316',
+    'FINAL APPROACH': '#ef4444',
+    'AUTO':          '#22d3ee',
+    'OFFLINE':       '#1e293b',
+  };
+  const col = phaseColor[dronePhase] ?? '#22a6c0';
+  const isActive = !['STANDBY', 'OFFLINE'].includes(dronePhase);
+
   return (
     <div className="ah-panel">
       {children}
@@ -227,6 +246,46 @@ export function ArtificialHorizon({ pitch, roll, yaw, children }: ArtificialHori
         {/* INTERNAL OVERLAY ADDITION */}
         <div className="ah-overlay">
         </div>
+      </div>
+
+      {/* ── Drone phase status box ── */}
+      <div style={{
+        marginTop: '8px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '8px',
+        padding: '6px 14px',
+        background: 'rgba(2,6,23,0.85)',
+        border: `1px solid ${col}44`,
+        borderRadius: '4px',
+        boxShadow: isActive ? `0 0 10px ${col}33` : 'none',
+        transition: 'all 0.4s ease',
+        maxWidth: '320px',
+        margin: '6px auto 0',
+      }}>
+        {/* Blinking indicator dot */}
+        <span style={{
+          display: 'inline-block',
+          width: '7px',
+          height: '7px',
+          borderRadius: '50%',
+          background: col,
+          flexShrink: 0,
+          animation: isActive ? 'ah-phase-blink 1.2s step-start infinite' : 'none',
+          boxShadow: `0 0 6px ${col}`,
+        }} />
+        <span style={{
+          fontFamily: "'Rajdhani', monospace",
+          fontSize: '13px',
+          fontWeight: 700,
+          letterSpacing: '2.5px',
+          color: col,
+          textTransform: 'uppercase',
+        }}>{dronePhase}</span>
+        <style>{`
+          @keyframes ah-phase-blink { 50% { opacity: 0.25; } }
+        `}</style>
       </div>
     </div>
   );

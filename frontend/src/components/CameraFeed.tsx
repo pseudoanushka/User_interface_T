@@ -430,7 +430,8 @@ export function CameraFeed() {
     useEffect(() => {
         let active = true;
         setLogTs(now());
-        const socket = new WebSocket(`${getRpiWsUrl()}/ws/video`);
+        const socket = new WebSocket(getRpiWsUrl());
+        console.log("Connecting to video via UDP Bridge:", getRpiWsUrl());
         
         socket.onmessage = async (event) => {
             if (!active) return;

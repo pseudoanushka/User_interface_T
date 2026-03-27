@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { TelemetryPanel } from "./t_panel";
 import { ArtificialHorizon } from "./ah";
 import { Compass } from "./Compass";
@@ -8,6 +9,7 @@ import { ChargingStatusPanel } from "./ChargingStatusPanel";
 import { MissionDataPanel } from "./MissionDataPanel";
 import { FailsafePanel } from "./FailsafePanel";
 import titansLogo from "./Titans_logo_white.png";
+import { getBaseUrl } from "../config";
 
 interface TelemetryData {
   position: { x: number; y: number; z: number };
@@ -23,6 +25,27 @@ interface TelemetryData {
 }
 
 export default function CockpitDashboard({ data }: { data: TelemetryData }) {
+  const [dronePhase, setDronePhase] = useState("STANDBY");
+
+  // Poll /rpi/phase every 500ms via the GCS server proxy
+  useEffect(() => {
+    let mounted = true;
+    const poll = async () => {
+      try {
+        const res = await fetch(`${getBaseUrl()}/rpi/phase`);
+        if (res.ok && mounted) {
+          const json = await res.json();
+          setDronePhase(json.phase ?? "STANDBY");
+        }
+      } catch {
+        // RPi offline — keep last known phase
+      }
+    };
+    poll();
+    const id = setInterval(poll, 500);
+    return () => { mounted = false; clearInterval(id); };
+  }, []);
+
   return (
     <>
       <CameraFeed />
@@ -55,6 +78,7 @@ export default function CockpitDashboard({ data }: { data: TelemetryData }) {
               pitch={data.attitude.pitch}
               roll={data.attitude.roll}
               yaw={data.attitude.yaw}
+              dronePhase={dronePhase}
             >
               {/* Embedded Widgets for Four-Corner Layout */}
               <div className="widget-corner top-left">
@@ -88,3 +112,4 @@ export default function CockpitDashboard({ data }: { data: TelemetryData }) {
     </>
   );
 }
+

@@ -2,7 +2,13 @@ from flask import Flask, render_template, send_from_directory, jsonify, request
 from flask_cors import CORS
 from flask_socketio import SocketIO
 import os, csv, json, math, threading, time, datetime
+import socket, struct, asyncio, websockets
+import urllib.request
 import listen
+
+# ── RPi connection config ────────────────────────────────────────────────────
+RPI_IP   = os.environ.get("RPI_IP",   "192.168.0.97")  # override with env var if needed
+RPI_PORT = os.environ.get("RPI_PORT", "8000")
 
 app = Flask(__name__, static_folder="frontend/dist/assets", static_url_path="/assets", template_folder="frontend/dist")
 CORS(app)
@@ -152,11 +158,118 @@ def _log_loop():
 
         time.sleep(1.0)
 
+# ── UDP Video Bridge ─────────────────────────────────────────────────────────
+class UDPVideoBridge:
+    def __init__(self, udp_port=5005, ws_port=9999):
+        self.udp_port = udp_port
+        self.ws_port = ws_port
+        self.connected_clients = set()
+        self.frame_buffer = {}
+
+    async def ws_handler(self, websocket):
+        self.connected_clients.add(websocket)
+        try:
+            await websocket.wait_closed()
+        finally:
+            self.connected_clients.remove(websocket)
+
+    async def udp_receiver(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind(("0.0.0.0", self.udp_port))
+        sock.setblocking(False)
+        loop = asyncio.get_event_loop()
+        print(f"[UDP-BRIDGE] Listening on port {self.udp_port}")
+
+        while True:
+            data, _ = await loop.sock_recvfrom(sock, 65535)
+            if len(data) < 8: continue
+            frame_id, idx, total = struct.unpack("<IHH", data[:8])
+            if frame_id not in self.frame_buffer:
+                self.frame_buffer[frame_id] = {"p": {}, "t": total}
+            self.frame_buffer[frame_id]["p"][idx] = data[8:]
+            if len(self.frame_buffer[frame_id]["p"]) == total:
+                full_frame = b"".join(self.frame_buffer[frame_id]["p"][i] for i in range(total))
+                json_header = json.dumps({"frame_id": frame_id, "ts": time.time()}).encode('utf-8')
+                msg = struct.pack("<I", len(json_header)) + json_header + full_frame
+                if self.connected_clients:
+                    await asyncio.gather(*(ws.send(msg) for ws in self.connected_clients), return_exceptions=True)
+                del self.frame_buffer[frame_id]
+                if len(self.frame_buffer) > 20: del self.frame_buffer[min(self.frame_buffer.keys())]
+
+    def run(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        async def _main():
+            # Start WebSocket server and UDP receiver concurrently on the same loop
+            ws_server = await websockets.serve(self.ws_handler, "0.0.0.0", self.ws_port)
+            print(f"[UDP-BRIDGE] WebSocket server on ws://0.0.0.0:{self.ws_port}")
+            await self.udp_receiver()   # runs forever; ws_server keeps accepting in background
+            ws_server.close()
+
+        loop.run_until_complete(_main())
+
+def start_udp_bridge():
+    bridge = UDPVideoBridge()
+    threading.Thread(target=bridge.run, daemon=True).start()
+
 # Start threads at module level
 threading.Thread(target=listen.main, daemon=True).start()
 threading.Thread(target=_log_loop,   daemon=True).start()
+start_udp_bridge()
 
-# ArUco thread removed — not in use
+# ── RPi Proxy helpers ─────────────────────────────────────────────────────────
+def _fetch_rpi_json(path: str, timeout: float = 1.0):
+    """Fetch JSON from the RPi FastAPI server with a short timeout."""
+    url = f"http://{RPI_IP}:{RPI_PORT}{path}"
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            return json.loads(r.read().decode())
+    except Exception:
+        return None
+
+# Cache the last known RPi telemetry so the endpoint doesn't block forever
+_rpi_telemetry_cache: dict = {}
+_rpi_telemetry_lock = threading.Lock()
+
+def _rpi_poll_loop():
+    """Background thread: poll RPi /telemetry every 200 ms and cache result."""
+    global _rpi_telemetry_cache
+    while True:
+        data = _fetch_rpi_json("/telemetry")
+        if data:
+            with _rpi_telemetry_lock:
+                _rpi_telemetry_cache = data
+        time.sleep(0.2)
+
+threading.Thread(target=_rpi_poll_loop, daemon=True).start()
+
+def _compute_phase(t: dict) -> str:
+    """Derive a human-readable flight phase from the RPi telemetry dict."""
+    ptp  = t.get("post_takeoff_phase", "idle")
+    auto = t.get("auto", False)
+    lp   = t.get("landing_phase", 0)
+    armed = t.get("armed", False)
+    in_air = t.get("in_air", False)
+
+    phase_map = {
+        "align_3_5m": "PT-ALIGNING",
+        "climb_3_5m": "PT-CLIMBING",
+        "hover_5min": "PT-HOVERING",
+        "auto_land":  "PT-AUTOLAND",
+    }
+    if ptp in phase_map:
+        return phase_map[ptp]
+
+    if auto:
+        lp_map = {0: "ALIGNING", 1: "DESCENDING", 2: "FINAL APPROACH"}
+        return lp_map.get(lp, "AUTO")
+
+    if in_air:
+        return "AIRBORNE"
+    if armed:
+        return "ARMED"
+    return "STANDBY"
 
 # ── Routes ───────────────────────────────────────────────────────────────────
 @app.route('/')
@@ -181,6 +294,24 @@ def telemetry():
         "ZIGBEE":  listen.get_data(),
         "ARDUINO": listen.get_arduino_data()
     })
+
+@app.route("/rpi/telemetry")
+def rpi_telemetry():
+    """Pass-through: return cached RPi telemetry."""
+    with _rpi_telemetry_lock:
+        data = dict(_rpi_telemetry_cache)
+    if not data:
+        return jsonify({"error": "RPi not reachable"}), 503
+    return jsonify(data)
+
+@app.route("/rpi/phase")
+def rpi_phase():
+    """Return the current drone flight phase as a short string."""
+    with _rpi_telemetry_lock:
+        data = dict(_rpi_telemetry_cache)
+    phase = _compute_phase(data) if data else "OFFLINE"
+    return jsonify({"phase": phase, "telemetry": data})
+
 
 @app.route("/relay", methods=["POST"])
 def relay_control():
