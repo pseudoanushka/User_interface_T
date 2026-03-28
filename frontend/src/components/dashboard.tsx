@@ -22,9 +22,11 @@ interface TelemetryData {
   cpuLoad: number;
   mode?: string;
   armed?: boolean;
+  connected?: boolean;
+  rc_available?: boolean;
 }
 
-export default function CockpitDashboard({ data }: { data: TelemetryData }) {
+export default function CockpitDashboard({ data, socket: _socket }: { data: TelemetryData; socket?: unknown }) {
   const [dronePhase, setDronePhase] = useState("STANDBY");
 
   // Poll /rpi/phase every 500ms via the GCS server proxy
@@ -94,11 +96,11 @@ export default function CockpitDashboard({ data }: { data: TelemetryData }) {
               </div>
 
               <div className="widget-corner bottom-left">
-                <VelocityVectors vz={data.position.z} position="left" />
+                <VelocityVectors vz={data.velocity.vz} position="left" />
               </div>
 
               <div className="widget-corner bottom-right">
-                <VelocityVectors vx={data.position.x} vy={data.position.y} position="right" />
+                <VelocityVectors vx={data.velocity.vx} vy={data.velocity.vy} position="right" />
               </div>
             </ArtificialHorizon>
           </div>

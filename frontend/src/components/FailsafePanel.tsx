@@ -227,15 +227,22 @@ export function FailsafePanel() {
 
   /* ── Extract telemetry fields ── */
   const tel = telemetry?.ZIGBEE ?? {};
+  const rpi = telemetry?.RPI ?? {};
   const att = tel.attitude ?? {};
   const pos = tel.position ?? {};
   const vel = tel.velocity ?? {};
-  const batt = typeof tel.battery === 'object'
-    ? tel.battery
-    : { percent: 0, voltage: 0, current: 0 };
 
+  // Battery: prefer RPi authoritative value, fallback to ZIGBEE
+  const battPct: number = rpi.battery != null
+    ? rpi.battery
+    : typeof tel.battery === 'object'
+      ? (tel.battery?.percent ?? 0)
+      : (tel.battery ?? 0);
+
+  // Armed / RC from RPi
+  const isArmed: boolean   = rpi.armed        ?? tel.armed        ?? false;
+  const rcAvail: boolean   = rpi.rc_available ?? true;
   /* ── Compute failsafes ── */
-  const battPct   = batt.percent ?? 0;
   const rollDeg   = Math.abs((att.roll  || 0) * (180 / Math.PI));
   const pitchDeg  = Math.abs((att.pitch || 0) * (180 / Math.PI));
   const tiltDeg   = Math.sqrt(rollDeg ** 2 + pitchDeg ** 2);
@@ -250,11 +257,18 @@ export function FailsafePanel() {
 
   const failsafes: FsItem[] = [
     {
+      id: 'armed',
+      icon: '🔒',
+      label: 'ARMED',
+      level: isArmed ? 'warn' : 'ok',
+      value: isArmed ? 'ARMED' : 'SAFE',
+    },
+    {
       id: 'batt',
       icon: '⚡',
       label: 'BATTERY',
       level: level(battPct, FS_THRESHOLDS.batt.warn, FS_THRESHOLDS.batt.crit, true),
-      value: `${battPct}%`,
+      value: `${typeof battPct === 'number' ? battPct.toFixed(1) : battPct}%`,
     },
     {
       id: 'tilt',
@@ -278,8 +292,15 @@ export function FailsafePanel() {
       value: `${vzAbs.toFixed(1)} m/s`,
     },
     {
-      id: 'link',
+      id: 'rc',
       icon: '📡',
+      label: 'RC LINK',
+      level: rcAvail ? 'ok' : 'crit',
+      value: rcAvail ? 'OK' : 'LOST',
+    },
+    {
+      id: 'link',
+      icon: '🖧',
       label: 'GCS LINK',
       level: level(telAge, FS_THRESHOLDS.link.warn, FS_THRESHOLDS.link.crit),
       value: telAge > 3 ? `${telAge.toFixed(0)}s AGO` : 'LIVE',

@@ -106,3 +106,13 @@ export function destroyBaseStationWS() {
   _ws?.close();
   _ws = null;
 }
+
+/** Send a raw text command to the base station server (e.g., "landed") */
+export function sendBaseStationCommand(cmd: string) {
+  if (_ws && _ws.readyState === WebSocket.OPEN) {
+    _ws.send(cmd);
+    console.log(`[BS-WS] Sent command: ${cmd}`);
+  } else {
+    console.warn(`[BS-WS] Cannot send command '${cmd}' — WebSocket not open`);
+  }
+}

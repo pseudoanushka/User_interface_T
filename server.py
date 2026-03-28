@@ -218,6 +218,53 @@ threading.Thread(target=listen.main, daemon=True).start()
 threading.Thread(target=_log_loop,   daemon=True).start()
 start_udp_bridge()
 
+# ── Port-8765 base-station WebSocket (started only after drone lands) ────────
+_8765_started = False
+_8765_lock    = threading.Lock()
+
+def start_8765_server():
+    """Import and run the testing_websocket server on port 8765."""
+    import asyncio, websockets as _ws
+
+    connected_clients: set = set()
+
+    async def hub(websocket):
+        connected_clients.add(websocket)
+        print("[8765] Client connected")
+        try:
+            async for msg in websocket:
+                for peer in connected_clients:
+                    if peer != websocket:
+                        await peer.send(msg)
+        finally:
+            connected_clients.discard(websocket)
+            print("[8765] Client disconnected")
+
+    async def _run():
+        async with _ws.serve(hub, "0.0.0.0", 8765):
+            print("[8765] Base-station WebSocket server started on port 8765")
+            await asyncio.Future()  # run forever
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(_run())
+
+def _watch_for_landing():
+    """Background thread: start port-8765 server the moment the drone reports landed."""
+    global _8765_started
+    while True:
+        with _rpi_telemetry_lock:
+            landed = _rpi_telemetry_cache.get("landed", False)
+        if landed and not _8765_started:
+            with _8765_lock:
+                if not _8765_started:          # double-checked locking
+                    _8765_started = True
+                    print("[GCS] Drone landed signal received — starting port-8765 server")
+                    threading.Thread(target=start_8765_server, daemon=True).start()
+        time.sleep(0.5)
+
+threading.Thread(target=_watch_for_landing, daemon=True).start()
+
 # ── RPi Proxy helpers ─────────────────────────────────────────────────────────
 def _fetch_rpi_json(path: str, timeout: float = 1.0):
     """Fetch JSON from the RPi FastAPI server with a short timeout."""
@@ -290,9 +337,12 @@ def script():
 
 @app.route("/telemetry")
 def telemetry():
+    with _rpi_telemetry_lock:
+        rpi_data = dict(_rpi_telemetry_cache)
     return jsonify({
         "ZIGBEE":  listen.get_data(),
-        "ARDUINO": listen.get_arduino_data()
+        "ARDUINO": listen.get_arduino_data(),
+        "RPI":     rpi_data,
     })
 
 @app.route("/rpi/telemetry")
@@ -311,6 +361,16 @@ def rpi_phase():
         data = dict(_rpi_telemetry_cache)
     phase = _compute_phase(data) if data else "OFFLINE"
     return jsonify({"phase": phase, "telemetry": data})
+
+@app.route("/landed-status")
+def landed_status():
+    """Frontend polls this to know when to connect to the port-8765 WebSocket."""
+    with _rpi_telemetry_lock:
+        landed = bool(_rpi_telemetry_cache.get("landed", False))
+    return jsonify({
+        "landed":   landed,
+        "ws_ready": _8765_started,   # True only after the server thread is up
+    })
 
 
 @app.route("/relay", methods=["POST"])
