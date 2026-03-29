@@ -24,6 +24,7 @@ interface TelemetryData {
   armed?: boolean;
   connected?: boolean;
   rc_available?: boolean;
+  arduino: { relay: string; currentA0: number; currentA1: number; voltageS1: number; voltageS2: number; raw?: string };
 }
 
 export default function CockpitDashboard({ data, socket: _socket }: { data: TelemetryData; socket?: unknown }) {
@@ -51,7 +52,7 @@ export default function CockpitDashboard({ data, socket: _socket }: { data: Tele
   return (
     <>
       <CameraFeed />
-      <ChargingStatusPanel />
+      <ChargingStatusPanel data={data.arduino} />
       
       {/* Logos & Overlays in remaining 1/3 viewport space */}
       <div style={{

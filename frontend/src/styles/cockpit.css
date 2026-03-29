@@ -624,7 +624,7 @@ canvas {
 
 .ah-battery-icon {
   border: 2px solid #4ade80;
-  width: 150px;
+  width: 120px;
   height: 200px;
   border-radius: 4px;
   position: relative;
@@ -649,6 +649,13 @@ canvas {
   flex: 1;
   background-color: transparent;
   border: 2px solid #4ade80;
+}
+
+@keyframes ah-danger-pulse {
+  50% { opacity: 0.25; }
+}
+.ah-battery-danger {
+  animation: ah-danger-pulse 0.7s step-start infinite;
 }
 
 .ah-battery-text {

@@ -210,13 +210,17 @@ export function FailsafePanel() {
   const [telemetry, setTelemetry] = useState<any>(null);
   const lastTelTsRef = useRef<number>(Date.now());
 
-  /* ── Telemetry polling (1 Hz) ── */
+  /* ── Parallel polling: params/all (JSON files) + telemetry (RPi/RC) ── */
   useEffect(() => {
     const poll = async () => {
       try {
-        const r = await fetch(`${getBaseUrl()}/telemetry`);
-        const j = await r.json();
-        setTelemetry(j);
+        const [pr, tr] = await Promise.all([
+          fetch(`${getBaseUrl()}/params/all`),
+          fetch(`${getBaseUrl()}/telemetry`),
+        ]);
+        const params = pr.ok ? await pr.json() : {};
+        const tdata  = tr.ok ? await tr.json() : {};
+        setTelemetry({ ...tdata, PARAMS: params });
         lastTelTsRef.current = Date.now();
       } catch { /* ignore */ }
     };
@@ -225,29 +229,39 @@ export function FailsafePanel() {
     return () => clearInterval(id);
   }, []);
 
-  /* ── Extract telemetry fields ── */
-  const tel = telemetry?.ZIGBEE ?? {};
-  const rpi = telemetry?.RPI ?? {};
-  const att = tel.attitude ?? {};
-  const pos = tel.position ?? {};
-  const vel = tel.velocity ?? {};
+  /* ── Extract fields ── */
+  const params = telemetry?.PARAMS ?? {};
+  const rpi    = telemetry?.RPI    ?? {};
+  const zigbee = telemetry?.ZIGBEE ?? {};
 
-  // Battery: prefer RPi authoritative value, fallback to ZIGBEE
-  const battPct: number = rpi.battery != null
-    ? rpi.battery
-    : typeof tel.battery === 'object'
-      ? (tel.battery?.percent ?? 0)
-      : (tel.battery ?? 0);
+  const batt = params.BATTERY_STATUS     ?? {};
+  const att  = params.ATTITUDE           ?? {};
+  const pos  = params.LOCAL_POSITION_NED ?? {};
 
-  // Armed / RC from RPi
-  const isArmed: boolean   = rpi.armed        ?? tel.armed        ?? false;
-  const rcAvail: boolean   = rpi.rc_available ?? true;
+  // Battery voltage from BATTERY_STATUS.json
+  const BATT_MIN_V = 12.0;
+  const BATT_MAX_V = 16.8;
+  const voltToPct = (v: number) =>
+    Math.min(100, Math.max(0, Math.round(((v - BATT_MIN_V) / (BATT_MAX_V - BATT_MIN_V)) * 100)));
+  const rawVoltages: number[] = batt.voltages ?? [];
+  const battMv      = rawVoltages.find((v: number) => v > 0 && v < 65535) ?? 0;
+  const battVoltage = rpi.battery != null
+    ? (typeof rpi.battery === 'object' ? (rpi.battery?.voltage ?? battMv / 1000) : battMv / 1000)
+    : battMv / 1000;
+  const battPct: number = voltToPct(battVoltage);
+
+  // Armed / RC
+  const hb      = params.HEARTBEAT ?? {};
+  const isArmed: boolean = rpi.armed ?? !!(( hb.base_mode ?? 0) & 0x80);
+  const rcAvail: boolean = rpi.rc_available ?? true;
+
   /* ── Compute failsafes ── */
-  const rollDeg   = Math.abs((att.roll  || 0) * (180 / Math.PI));
-  const pitchDeg  = Math.abs((att.pitch || 0) * (180 / Math.PI));
-  const tiltDeg   = Math.sqrt(rollDeg ** 2 + pitchDeg ** 2);
+  const toDeg   = (r: number) => r * (180 / Math.PI);
+  const rollDeg  = Math.abs(toDeg(att.roll  || 0));
+  const pitchDeg = Math.abs(toDeg(att.pitch || 0));
+  const tiltDeg  = Math.sqrt(rollDeg ** 2 + pitchDeg ** 2);
   const homeDistM = Math.sqrt((pos.x || 0) ** 2 + (pos.y || 0) ** 2);
-  const vzAbs     = Math.abs(vel.vz || 0);
+  const vzAbs     = Math.abs((pos.vz || zigbee.velocity?.vz) || 0);
   const telAge    = (Date.now() - lastTelTsRef.current) / 1000;
 
   const level = (val: number, warn: number, crit: number, invert = false): FsLevel => {
@@ -270,13 +284,13 @@ export function FailsafePanel() {
       level: level(battPct, FS_THRESHOLDS.batt.warn, FS_THRESHOLDS.batt.crit, true),
       value: `${typeof battPct === 'number' ? battPct.toFixed(1) : battPct}%`,
     },
-    {
-      id: 'tilt',
-      icon: '✈',
-      label: 'TILT',
-      level: level(tiltDeg, FS_THRESHOLDS.tilt.warn, FS_THRESHOLDS.tilt.crit),
-      value: `${tiltDeg.toFixed(1)}°`,
-    },
+    // {
+    //   id: 'tilt',
+    //   icon: '✈',
+    //   label: 'TILT',
+    //   level: level(tiltDeg, FS_THRESHOLDS.tilt.warn, FS_THRESHOLDS.tilt.crit),
+    //   value: `${tiltDeg.toFixed(1)}°`,
+    // },
     {
       id: 'geo',
       icon: '◎',

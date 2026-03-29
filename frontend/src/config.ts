@@ -7,10 +7,8 @@ export const BACKEND_PORT = "8000";
 export const RPI_IP = "192.168.0.97"; 
 export const RPI_PORT = "8000";
 
-// BASE STATION (sender machine — JSON events + camera feed on same WS)
-export const BASE_STATION_IP   = "192.168.0.42";
-export const BASE_STATION_WS_PORT = "8765";
-export const UDP_BRIDGE_WS_PORT = "9999";
+// BASE STATION (camera feed over UDP -> WS)
+export const BASE_STATION_WS_PORT = "9998";
 
 export const getBaseUrl = () => `http://${BACKEND_IP}:${BACKEND_PORT}`;
 export const getWsUrl = () => `ws://${BACKEND_IP}:${BACKEND_PORT}`;
@@ -19,4 +17,4 @@ export const getRpiUrl = () => `http://${RPI_IP}:${RPI_PORT}`;
 export const getRpiWsUrl = () => `ws://${RPI_IP}:${RPI_PORT}/ws/video`; // Direct RPi WebSocket video stream
 
 export const getBaseStationWsUrl = () =>
-  `ws://${BASE_STATION_IP}:${BASE_STATION_WS_PORT}`;
+  `ws://${BACKEND_IP}:${BASE_STATION_WS_PORT}`;

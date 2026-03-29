@@ -250,36 +250,35 @@ export function ArtificialHorizon({ pitch, roll, yaw, dronePhase = 'STANDBY', ch
 
       {/* ── Drone phase status box ── */}
       <div style={{
-        marginTop: '8px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '8px',
-        padding: '6px 14px',
+        gap: '12px',
+        padding: '10px 28px',
         background: 'rgba(2,6,23,0.85)',
         border: `1px solid ${col}44`,
         borderRadius: '4px',
-        boxShadow: isActive ? `0 0 10px ${col}33` : 'none',
+        boxShadow: isActive ? `0 0 14px ${col}33` : 'none',
         transition: 'all 0.4s ease',
-        maxWidth: '320px',
-        margin: '6px auto 0',
+        maxWidth: '420px',
+        margin: '22px auto 0',
       }}>
         {/* Blinking indicator dot */}
         <span style={{
           display: 'inline-block',
-          width: '7px',
-          height: '7px',
+          width: '11px',
+          height: '11px',
           borderRadius: '50%',
           background: col,
           flexShrink: 0,
           animation: isActive ? 'ah-phase-blink 1.2s step-start infinite' : 'none',
-          boxShadow: `0 0 6px ${col}`,
+          boxShadow: `0 0 8px ${col}`,
         }} />
         <span style={{
           fontFamily: "'Rajdhani', monospace",
-          fontSize: '13px',
+          fontSize: '22px',
           fontWeight: 700,
-          letterSpacing: '2.5px',
+          letterSpacing: '4px',
           color: col,
           textTransform: 'uppercase',
         }}>{dronePhase}</span>

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { getBaseUrl } from '../config';
 
 const MAX_CURRENT = 4.0;
 const MIN_VOLTAGE = 12.0;
-const MAX_VOLTAGE = 16.5;
+const MAX_VOLTAGE = 16.4;
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap');
@@ -32,14 +33,14 @@ const styles = `
   }
 
   .csp-title {
-    font-size: clamp(14px, 1.3vw, 24px);
+    font-size: clamp(25px, 1.3vw, 24px);
     letter-spacing: 2px;
     color: #e7edeeff;
     text-transform: uppercase;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    margin-top: -2px;
+    margin-top: -55px;
   }
 
   .csp-relay-badge {
@@ -81,7 +82,7 @@ const styles = `
     width: 50%;
   }
   .csp-header-right {
-    border-left: 1px solid #1a3040;
+    border-left: 1px solid #dfe9f0;
     padding-left: 12px;
   }
   .csp-header-left {
@@ -107,7 +108,7 @@ const styles = `
     padding: 15px 12px;
     display: flex;
     flex-direction: column;
-    gap: 30px;
+    gap: 10px;
   }
 
   .csp-row {
@@ -205,6 +206,37 @@ const styles = `
     background: #0f1e28;
     margin: 2px 0;
   }
+
+  .csp-mission-badge {
+    font-size: 16px;
+    letter-spacing: 2px;
+    padding: 2px 8px;
+    border-radius: 2px;
+    text-transform: uppercase;
+    font-weight: bold;
+  }
+  .csp-mission-safe {
+    background: rgba(231, 240, 234, 0.95);
+    border: 1px solid #27ae60;
+    color: #27ae60;
+  }
+  .csp-mission-abort {
+    background: rgba(192,57,43,0.12);
+    border: 1px solid #c0392b;
+    color: #c0392b;
+    animation: csp-pulse 0.4s step-start infinite;
+  }
+  .csp-soh-meta-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 16px;
+    letter-spacing: 1px;
+    color: #6a8fa0;
+  }
+  .csp-soh-meta-row span:last-child {
+    color: #a0c8d8;
+  }
+
 `;
 
 interface ArduinoData {
@@ -213,6 +245,15 @@ interface ArduinoData {
   currentA1: number;
   voltageS1: number;
   voltageS2: number;
+}
+
+interface ChargingStatus {
+  charging: boolean;
+  landed: boolean;
+  source: string | null;
+  timestamp: string | null;
+  relay_armed: boolean;
+  relay_triggered: boolean;
 }
 
 function currentClass(a: number) {
@@ -257,39 +298,67 @@ function VoltageRow({ label, value }: { label: string; value: number }) {
   );
 }
 
-export function ChargingStatusPanel() {
-  const [data, setData] = useState<ArduinoData>({
-    relay: 'UNKNOWN', currentA0: 0, currentA1: 0, voltageS1: 0, voltageS2: 0,
-  });
+interface SOHData {
+  soh:            number | null;
+  r_int_ohm:      number | null;
+  r_int_samples:  number;
+  c_used_mah:     number;
+  v_cell_delta_v: number | null;
+  mission_safe:   boolean;
+}
 
-  useEffect(() => {
-    const onArduinoData = (e: Event) => {
-      const d = (e as CustomEvent).detail;
-      if (!d) return;
-      setData({
-        relay:      d.relay      ?? 'UNKNOWN',
-        currentA0:  d.current_A0 ?? 0,
-        currentA1:  d.current_A1 ?? 0,
-        voltageS1:  d.voltage_S1 ?? 0,
-        voltageS2:  d.voltage_S2 ?? 0,
-      });
-    };
-    window.addEventListener('bs:arduino_data', onArduinoData);
-    return () => window.removeEventListener('bs:arduino_data', onArduinoData);
-  }, []);
-
-  const relaying = data.relay === 'ON';
+export function ChargingStatusPanel({ data }: { data: ArduinoData }) {
+  const relaying    = data.relay === 'ON';
   const overCurrent = data.currentA0 > MAX_CURRENT || data.currentA1 > MAX_CURRENT;
   const lowVoltage  = (data.voltageS1 > 0 && data.voltageS1 < MIN_VOLTAGE) ||
                       (data.voltageS2 > 0 && data.voltageS2 < MIN_VOLTAGE);
 
-  // Battery health: average of non-zero voltages, scaled MIN→MAX
-  const voltages = [data.voltageS1, data.voltageS2].filter(v => v > 0);
-  const avgVoltage = voltages.length > 0 ? voltages.reduce((a,b) => a+b, 0) / voltages.length : 0;
-  const healthPct = avgVoltage > 0
-    ? Math.round(Math.min(100, Math.max(0, ((avgVoltage - MIN_VOLTAGE) / (MAX_VOLTAGE - MIN_VOLTAGE)) * 100)))
-    : null;
-  const healthClass = healthPct === null ? '' : healthPct >= 60 ? 'csp-health-green' : healthPct >= 30 ? 'csp-health-orange' : 'csp-health-red';
+  const [sohData, setSohData] = useState<SOHData | null>(null);
+  const [chargingStatus, setChargingStatus] = useState<ChargingStatus | null>(null);
+
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const r = await fetch(`${getBaseUrl()}/battery/soh`);
+        setSohData(await r.json());
+      } catch { /* ignore */ }
+    };
+    poll();
+    const id = setInterval(poll, 2000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const r = await fetch(`${getBaseUrl()}/charging-status`);
+        setChargingStatus(await r.json());
+      } catch { /* ignore */ }
+    };
+    poll();
+    const id = setInterval(poll, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const soh         = sohData?.soh ?? null;
+  const missionSafe = sohData?.mission_safe ?? true;
+  const sohClass    = soh === null ? '' : soh >= 60 ? 'csp-health-green' : soh >= 30 ? 'csp-health-orange' : 'csp-health-red';
+  const rIntLabel   = sohData?.r_int_ohm != null
+    ? `${(sohData.r_int_ohm * 1000).toFixed(1)} mΩ`
+    : (sohData?.r_int_samples === 0 ? 'ESTIMATING…' : '--');
+
+  const isCharging      = chargingStatus?.charging      ?? false;
+  const isLanded        = chargingStatus?.landed         ?? false;
+  const isRelayArmed    = chargingStatus?.relay_armed    ?? false;
+  const isRelayTriggered = chargingStatus?.relay_triggered ?? false;
+  const chargingSource  = chargingStatus?.source         ?? null;
+  const chargingTs      = chargingStatus?.timestamp      ?? null;
+
+  // Derive charging badge text: prefer live charging-status over arduino relay
+  const chargingBadgeOn  = isCharging || relaying;
+  const chargingBadgeText = isCharging
+    ? (isRelayTriggered ? 'CHARGING ACTIVE' : isRelayArmed ? 'RELAY ARMED' : 'CHARGING INITIATED')
+    : (relaying ? 'CHARGING INITIATED' : 'CHARGING NOT INITIATED');
 
   return (
     <>
@@ -299,30 +368,82 @@ export function ChargingStatusPanel() {
           {/* Left: State of Charge */}
           <div className="csp-header-left">
             <span className="csp-title">STATE OF CHARGE</span>
-            {data.relay !== 'UNKNOWN' && (
-              <span className={`csp-relay-badge csp-relay-${data.relay.toLowerCase()}`}>
-                {relaying ? 'CHARGING INITIATED' : 'CHARGING NOT INITIATED'}
+            <span className={`csp-relay-badge csp-relay-${chargingBadgeOn ? 'on' : 'off'}`}>
+              {chargingBadgeText}
+            </span>
+          </div>
+          {/* Right: Battery SOH */}
+          <div className="csp-header-right">
+            <span className="csp-health-label">BATTERY SOH</span>
+            <span className={`csp-health-value ${sohClass}`}>
+              {soh !== null ? `${soh}%` : '-- %'}
+            </span>
+            {soh !== null && soh < 20 ? (
+              <span className="csp-mission-badge csp-mission-abort">⚠ DANGER — LOW SOH</span>
+            ) : (
+              <span className={`csp-mission-badge csp-mission-${missionSafe ? 'safe' : 'abort'}`}>
+                {missionSafe ? '● MISSION SAFE' : '⚠ ABORT'}
               </span>
             )}
-          </div>
-          {/* Right: Battery Health */}
-          <div className="csp-header-right">
-            <span className="csp-health-label">BATTERY HEALTH</span>
-            <span className={`csp-health-value ${healthClass}`}>
-              {healthPct !== null ? `${healthPct}%` : '-- %'}
-            </span>
           </div>
         </div>
 
         <div className="csp-body">
           {/* Current */}
-          <CurrentRow label="CURRENT" value={data.currentA0} />
+          <CurrentRow label="CURRENT I1" value={data.currentA0} />
+          <CurrentRow label="CURRENT I2" value={data.currentA1} />
 
           <div className="csp-divider" />
 
           {/* Voltage */}
           <VoltageRow label="VOLTAGE S1" value={data.voltageS1} />
           <VoltageRow label="VOLTAGE S2" value={data.voltageS2} />
+
+          <div className="csp-divider" />
+
+          {/* Charging status fields from CHARGING_STATUS.json */}
+          <div className="csp-soh-meta-row">
+            <span>LANDED</span>
+            <span style={{ color: isLanded ? '#27ae60' : '#6a8fa0' }}>{isLanded ? 'YES' : 'NO'}</span>
+          </div>
+          <div className="csp-soh-meta-row">
+            <span>RELAY</span>
+            <span style={{ color: isRelayTriggered ? '#27ae60' : isRelayArmed ? '#e67e22' : '#6a8fa0' }}>
+              {isRelayTriggered ? 'TRIGGERED' : isRelayArmed ? 'ARMED' : 'OFF'}
+            </span>
+          </div>
+          {chargingSource && (
+            <div className="csp-soh-meta-row">
+              <span>SOURCE</span>
+              <span style={{ color: '#a0c8d8' }}>{chargingSource.toUpperCase()}</span>
+            </div>
+          )}
+          {chargingTs && (
+            <div className="csp-soh-meta-row">
+              <span>UPDATED</span>
+              <span style={{ color: '#6a8fa0', fontSize: '14px' }}>{chargingTs.slice(11, 19)}</span>
+            </div>
+          )}
+
+          <div className="csp-divider" />
+
+          {/* SOH metrics */}
+          <div className="csp-soh-meta-row">
+            <span>R_INT</span>
+            <span>{rIntLabel}</span>
+          </div>
+          <div className="csp-soh-meta-row">
+            <span>CONSUMED</span>
+            <span>{sohData ? `${sohData.c_used_mah.toFixed(0)} mAh` : '--'}</span>
+          </div>
+          {sohData?.v_cell_delta_v != null && (
+            <div className="csp-soh-meta-row">
+              <span>CELL Δ</span>
+              <span style={{ color: sohData.v_cell_delta_v > 0.2 ? '#e67e22' : '#27ae60' }}>
+                {(sohData.v_cell_delta_v * 1000).toFixed(0)} mV
+              </span>
+            </div>
+          )}
 
           {/* Alarm / Warning banners */}
           {overCurrent && (

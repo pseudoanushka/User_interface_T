@@ -46,26 +46,21 @@ function connect() {
     }
   };
 
-  _ws.onmessage = (ev: MessageEvent) => {
-    if (typeof ev.data === "string") {
-      // ── JSON event ──────────────────────────────────────────────────────
-      try {
-        const data = JSON.parse(ev.data);
-        const event = data?.event as string | undefined;
-        if (event === "arduino_data") {
-          dispatch("bs:arduino_data", data);
-        } else if (event === "zone_update") {
-          dispatch("bs:zone_update", data);
-        } else {
-          console.warn("[BS-WS] Unknown event:", event, data);
-        }
-      } catch {
-        console.warn("[BS-WS] Non-JSON text frame:", ev.data);
-      }
-    } else {
-      // ── Binary frame → camera JPEG ───────────────────────────────────────
-      dispatch("bs:camera_frame", ev.data); // ev.data is already a Blob
-    }
+  _ws.onmessage = async (ev: MessageEvent) => {
+    // ── Binary frame → base station camera JPEG ────────────────────────────
+    if (!(ev.data instanceof Blob)) return;
+    try {
+      if (ev.data.size < 4) return;
+      const headerBuffer = await ev.data.slice(0, 4).arrayBuffer();
+      const view = new DataView(headerBuffer);
+      const headerLen = view.getUint32(0, true);
+      // Sanity-check: JSON header should never exceed 4 KB
+      if (headerLen > 4096) return;
+      const headerEnd = 4 + headerLen;
+      if (ev.data.size < headerEnd) return;
+      const jpegBlob = ev.data.slice(headerEnd, ev.data.size, 'image/jpeg');
+      dispatch("bs:camera_frame", jpegBlob);
+    } catch { /* malformed frame — skip silently */ }
   };
 
   _ws.onclose = (ev) => {

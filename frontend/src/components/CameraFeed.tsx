@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-import { getRpiWsUrl, getRpiUrl, BACKEND_IP } from "../config";
+import { getRpiWsUrl, getRpiUrl, BACKEND_IP, getBaseUrl } from "../config";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap');
@@ -213,7 +213,7 @@ const styles = `
   /* ── Overlay Controls ── */
   .feed-overlay-controls {
     position: absolute;
-    top: 10px;
+    top: 200px;
     right: 10px;
     width: 140px;
     z-index: 30;
@@ -426,48 +426,54 @@ export function CameraFeed() {
         setLogMsg(msg);
     };
 
-    // ── RPi camera feed (binary WS frames) ─────────────────────────────────
+    // ── RPi camera feed (binary WS frames, auto-reconnect) ─────────────────
     useEffect(() => {
         let active = true;
-        setLogTs(now());
-        const socket = new WebSocket(getRpiWsUrl());
-        console.log("Connecting to video via UDP Bridge:", getRpiWsUrl());
-        
-        socket.onmessage = async (event) => {
-            if (!active) return;
-            if (!(event.data instanceof Blob)) return;
-            
-            const buffer = await event.data.arrayBuffer();
-            if (buffer.byteLength < 4) return;
-            
-            const view = new DataView(buffer);
-            const headerLen = view.getUint32(0, true); // true for little-endian
-            const headerEnd = 4 + headerLen;
-            
-            if (buffer.byteLength < headerEnd) return;
-            
-            const jpegBuffer = buffer.slice(headerEnd);
-            const jpegBlob = new Blob([jpegBuffer], { type: 'image/jpeg' });
-            
-            if (!rpiCamActive) setRpiCamActive(true);
-            
-            if (imgRef.current) {
-                const url = URL.createObjectURL(jpegBlob);
-                const oldUrl = imgRef.current.src;
-                imgRef.current.src = url;
-                if (oldUrl.startsWith('blob:')) {
-                    URL.revokeObjectURL(oldUrl);
-                }
-            }
-        };
+        let ws: WebSocket | null = null;
+        let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-        socket.onopen = () => console.log("RPi Video WS Connected");
-        socket.onerror = (err) => console.error("RPi Video WS Error:", err);
-        socket.onclose = () => console.log("RPi Video WS Closed");
+        function connect() {
+            if (!active) return;
+            ws = new WebSocket(getRpiWsUrl());
+            console.log("Connecting to RPi video:", getRpiWsUrl());
+
+            ws.onmessage = async (event) => {
+                if (!active) return;
+                try {
+                    if (!(event.data instanceof Blob)) return;
+                    const buffer = await event.data.arrayBuffer();
+                    if (buffer.byteLength < 4) return;
+                    const view = new DataView(buffer);
+                    const headerLen = view.getUint32(0, true);
+                    if (headerLen > 4096 || buffer.byteLength < 4 + headerLen) return;
+                    const jpegBlob = new Blob([buffer.slice(4 + headerLen)], { type: 'image/jpeg' });
+                    if (!rpiCamActive) setRpiCamActive(true);
+                    if (imgRef.current) {
+                        const url = URL.createObjectURL(jpegBlob);
+                        const old = imgRef.current.src;
+                        imgRef.current.src = url;
+                        if (old.startsWith('blob:')) URL.revokeObjectURL(old);
+                    }
+                } catch { /* malformed frame — skip */ }
+            };
+
+            ws.onopen  = () => console.log("RPi Video WS connected");
+            ws.onerror = () => ws?.close();
+            ws.onclose = () => {
+                ws = null;
+                if (active) {
+                    console.log("RPi Video WS closed — reconnecting in 3s");
+                    reconnectTimer = setTimeout(connect, 3000);
+                }
+            };
+        }
+
+        connect();
 
         return () => {
             active = false;
-            socket.close();
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+            ws?.close();
         };
     }, []); // Only connect once on mount
 
@@ -475,8 +481,15 @@ export function CameraFeed() {
     const onBsFrame = useCallback((e: Event) => {
         const blob = (e as CustomEvent<Blob>).detail;
         if (!blob) return;
-        const url = URL.createObjectURL(blob);
-        if (pipImgRef.current) pipImgRef.current.src = url;
+        
+        if (pipImgRef.current) {
+            const url = URL.createObjectURL(blob);
+            const oldUrl = pipImgRef.current.src;
+            pipImgRef.current.src = url;
+            if (oldUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(oldUrl);
+            }
+        }
         setBsCamActive(true);
     }, []);
 
@@ -528,6 +541,9 @@ export function CameraFeed() {
         log('LAND initiated — auto-descent active');
         cmd('land');
         window.dispatchEvent(new Event('mission:stop'));
+        fetch(`${getBaseUrl()}/bs/landed`, { method: 'POST' })
+            .then(() => log('RELAY ARMED — base station notified'))
+            .catch(() => log('RELAY ARM FAILED — base station unreachable'));
     };
 
     const handleDisarm = () => {
@@ -585,13 +601,17 @@ export function CameraFeed() {
                         className={`feed-container ${!isSwapped ? 'pip' : 'main'}`}
                         onClick={!isSwapped ? () => setIsSwapped(true) : undefined}
                     >
-                        {bsCamActive 
-                            ? <img ref={pipImgRef} alt="Base Station Feed" />
-                            : <div className="no-signal">
+                        <img 
+                            ref={pipImgRef} 
+                            alt="Base Station Feed" 
+                            style={{ display: bsCamActive ? 'block' : 'none', width: '100%', height: '100%', objectFit: 'cover' }} 
+                        />
+                        {!bsCamActive && (
+                            <div className="no-signal">
                                 <div className="no-signal-icon">⊘</div>
                                 CAM-02 NO SIGNAL
-                              </div>
-                        }
+                            </div>
+                        )}
                         <span className="feed-tag">CAM-02 / BASE</span>
                         <span className="swap-hint">⇋ SWAP</span>
                     </div>
@@ -628,20 +648,7 @@ export function CameraFeed() {
                             <button className="overlay-btn" onClick={() => cmdAction('stop_recording', 'REC STOP')}>OFF</button>
                         </div>
 
-                        <div className="overlay-label" style={{marginTop: '6px'}}>NUDGE & YAW</div>
-                        <div className="overlay-grid">
-                            <button className="overlay-btn" onClick={() => cmdAction('yaw/l', 'YAW LEFT')}>↶</button>
-                            <button className="overlay-btn" onClick={() => cmdAction('nudge/w', 'NUDGE FWD')}>W</button>
-                            <button className="overlay-btn" onClick={() => cmdAction('yaw/r', 'YAW RIGHT')}>↷</button>
-                            
-                            <button className="overlay-btn" onClick={() => cmdAction('nudge/a', 'NUDGE LEFT')}>A</button>
-                            <button className="overlay-btn" onClick={() => cmdAction('recenter', 'RECENTER')}>●</button>
-                            <button className="overlay-btn" onClick={() => cmdAction('nudge/d', 'NUDGE RIGHT')}>D</button>
-                            
-                            <button className="overlay-btn" onClick={() => cmdAction('nudge/dn', 'NUDGE DOWN')}>▼</button>
-                            <button className="overlay-btn" onClick={() => cmdAction('nudge/s', 'NUDGE BWD')}>S</button>
-                            <button className="overlay-btn" onClick={() => cmdAction('nudge/up', 'NUDGE UP')}>▲</button>
-                        </div>
+
                     </div>
                 </div>
 
