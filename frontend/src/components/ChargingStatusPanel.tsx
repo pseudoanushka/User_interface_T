@@ -355,10 +355,11 @@ export function ChargingStatusPanel({ data }: { data: ArduinoData }) {
   const chargingTs      = chargingStatus?.timestamp      ?? null;
 
   // Derive charging badge text: prefer live charging-status over arduino relay
+  const hasVoltage       = data.voltageS1 > 1.0 || data.voltageS2 > 1.0;
   const chargingBadgeOn  = isCharging || relaying;
   const chargingBadgeText = isCharging
     ? (isRelayTriggered ? 'CHARGING ACTIVE' : isRelayArmed ? 'RELAY ARMED' : 'CHARGING INITIATED')
-    : (relaying ? 'CHARGING INITIATED' : 'CHARGING NOT INITIATED');
+    : (relaying && hasVoltage ? 'CHARGING INITIATED' : 'CHARGING NOT INITIATED');
 
   return (
     <>

@@ -1,8 +1,13 @@
 {
     "relay": "ON",
-    "currentA0": 0.0,
+    "currentA0": 0.04,
     "currentA1": 0.0,
-    "voltageS1": 0.0,
-    "voltageS2": 0.03,
-    "raw": "{\"event\": \"arduino_data\", \"timestamp\": 1774519442.2805114, \"relay\": \"ON\", \"current_A0\": 0.0, \"current_A1\": 0.0, \"voltage_S1\": 0.0, \"voltage_S2\": 0.03}"
+    "voltageS1": 16.74,
+    "voltageS2": 16.71,
+    "zone_state": "OUT",
+    "zone_marker": {},
+    "relay_armed": true,
+    "relay_triggered": true,
+    "last_event": "arduino_data",
+    "raw": "{\"event\": \"arduino_data\", \"timestamp\": 1775049777.5920177, \"relay\": \"ON\", \"current_A1\": 0.04, \"current_A2\": 0.0, \"voltage_S1\": 16.74, \"voltage_S2\": 16.71}"
 }

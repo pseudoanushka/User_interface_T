@@ -103,13 +103,24 @@ export default function App() {
         const flightMode = tel.ZIGBEE?.mode ?? tel.ZIGBEE?.flight_mode ?? "UNKNOWN";
 
         // ── Arduino / Base Station ────────────────────────────────────────────
+        // Only use file-cached values if the timestamp in the raw field is fresh
+        // (within 15 s). Prevents stale JSON from a previous session showing up.
+        let ardFresh = false;
+        try {
+          if (ard_raw.raw) {
+            const parsed = JSON.parse(ard_raw.raw);
+            const ts: number = parsed.timestamp ?? 0;
+            ardFresh = ts > 0 && (Date.now() / 1000 - ts) < 15;
+          }
+        } catch { /* malformed raw — treat as stale */ }
+
         const arduino = {
-          relay:     ard_raw.relay     ?? "UNKNOWN",
-          currentA0: ard_raw.currentA0 ?? 0,
-          currentA1: ard_raw.currentA1 ?? 0,
-          voltageS1: ard_raw.voltageS1 ?? 0,
-          voltageS2: ard_raw.voltageS2 ?? 0,
-          raw:       ard_raw.raw       ?? "",
+          relay:     ardFresh ? (ard_raw.relay     ?? "UNKNOWN") : "UNKNOWN",
+          currentA0: ardFresh ? (ard_raw.currentA0 ?? 0)        : 0,
+          currentA1: ardFresh ? (ard_raw.currentA1 ?? 0)        : 0,
+          voltageS1: ardFresh ? (ard_raw.voltageS1 ?? 0)        : 0,
+          voltageS2: ardFresh ? (ard_raw.voltageS2 ?? 0)        : 0,
+          raw:       ard_raw.raw ?? "",
         };
 
         // ── Landed → trigger base station charging relay ──────────────────────
