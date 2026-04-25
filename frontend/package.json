@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "backend": "python -u ../server.py",
+    "backend": "python -u ../backend/server.py",
     "frontend": "vite",
     "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
     "build": "tsc -b && vite build",
