@@ -447,14 +447,14 @@ def process_telem_packet(code: str, values: list, source: str) -> None:
     elif code == "B" and len(values) == 3:
         _write_telem_json(_TELEM_BATTERY_JSON, {
             "mavpackettype":     "BATTERY_STATUS",
-            "voltages":          [int(values[0] * 1000)] + [65535] * 9,
-            "current_battery":   int(values[2] * 100),
-            "battery_remaining": int(values[1]),
+            "voltages":          [int(_safe_float(values[0]) * 1000)] + [65535] * 9,
+            "current_battery":   int(_safe_float(values[2]) * 100),
+            "battery_remaining": int(_safe_float(values[1])),
         })
     elif code == "D" and len(values) == 3:
         _write_telem_json(_TELEM_DISTANCE_JSON, {
             "mavpackettype":    "DISTANCE_SENSOR",
-            "current_distance": int(values[0] * 100),
+            "current_distance": int(_safe_float(values[0]) * 100),
         })
 
 
