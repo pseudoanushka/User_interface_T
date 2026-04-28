@@ -413,6 +413,7 @@ def _parse_telem_packet(raw: str):
 
 def _write_telem_json(path: str, data: dict) -> None:
     try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         with _telem_json_lock:
             with open(path, "w") as f:
                 json.dump(data, f, indent=4)
@@ -455,6 +456,8 @@ def process_telem_packet(code: str, values: list, source: str) -> None:
         _write_telem_json(_TELEM_DISTANCE_JSON, {
             "mavpackettype":    "DISTANCE_SENSOR",
             "current_distance": int(_safe_float(values[0]) * 100),
+            "rpi_temp":         round(_safe_float(values[1]), 1),
+            "imu_temp":         round(_safe_float(values[2]), 1),
         })
 
 
