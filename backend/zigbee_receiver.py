@@ -38,7 +38,7 @@ import shutil
 from datetime import datetime
 from enum import Enum
 from threading import Lock
-
+from typing import Dict, List
 import serial
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -46,7 +46,7 @@ import serial
 # ─────────────────────────────────────────────────────────────────────────────
 # Primary: Zigbee radio module connected via serial COM port
 ZIGBEE_COM_PORT  = "COM11"     # serial port the Zigbee module is on
-ZIGBEE_BAUD_RATE = 115200      # must match the Zigbee module firmware
+ZIGBEE_BAUD_RATE = 115200     # must match the Zigbee module firmware
 
 # Fallback: direct UDP sender (e.g. WiFi direct from drone)
 UDP_IP           = "0.0.0.0"
@@ -74,13 +74,13 @@ log = logging.getLogger("zigbee_rx")
 # ─────────────────────────────────────────────────────────────────────────────
 CODES = ["A", "B", "D"]
 
-PARAM_ORDER: dict[str, list[str]] = {
+PARAM_ORDER: Dict[str, List[str]] = {
     "A": ["roll", "pitch", "yaw", "pos_x", "pos_y", "pos_z", "vel_x", "vel_y", "vel_z"],
     "B": ["voltage", "battery", "current"],
     "D": ["distance", "rpi_temp", "imu_temp"],
 }
 
-PARAM_UNITS: dict[str, str] = {
+PARAM_UNITS: Dict[str, List[str]] = {
     "roll": "°",   "pitch": "°",   "yaw": "°",
     "pos_x": "m",  "pos_y": "m",   "pos_z": "m",
     "vel_x": "m/s","vel_y": "m/s", "vel_z": "m/s",

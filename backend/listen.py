@@ -10,6 +10,7 @@ from typing import Optional
 from pymavlink import mavutil
 from threading import Lock
 import threading
+from typing import Dict, List
 
 BS_UDP_IP = "0.0.0.0"
 BS_UDP_PORT = 5007
@@ -216,7 +217,7 @@ latest_data = {
 }
 
 # ================= CONFIG =================
-COM_PORT = "COM11"
+COM_PORT = "/dev/ttyUSB0"
 BAUD = 115200
 PARAMS_DIR = os.path.join(_BASE_DIR, "public", "params")
 
@@ -381,7 +382,7 @@ def trigger_takeoff(altitude=10.0):
 # _telem_source is the single gate: only the matching source writes JSON.
 # ══════════════════════════════════════════════════════════════════════════════
 
-ZIGBEE_COM_PORT  = "COM11"
+ZIGBEE_COM_PORT  = "/dev/ttyUSB0"
 ZIGBEE_BAUD_RATE = 115200
 ZIGBEE_TIMEOUT   = 2.0      # serial read timeout (s); empty readline → failover
 
