@@ -152,6 +152,11 @@ _code_freq_ema: dict   = {}
 _param_frequency: dict = {}
 _param_values: dict    = {}
 
+# ── Diagnostic counters (event-loop only — no lock needed) ───────────────────
+_rx_total:    int = 0   # raw lines received from active source
+_parse_ok:    int = 0   # packets recognised and applied to state
+_parse_fail:  int = 0   # packets dropped (malformed / unknown code)
+
 
 def _update_code_freq(code: str, t: float) -> float:
     if code in _code_last_time:
@@ -274,6 +279,7 @@ async def read_from_zigbee(queue: asyncio.Queue) -> None:
                 ts   = time.monotonic()
                 text = line.decode("utf-8", errors="replace").strip()
                 if text:
+                    log.debug(f"[ZIGBEE] RAW: {text!r}")
                     await queue.put((text, ts))
         except serial.SerialException as exc:
             log.error(f"[ZIGBEE] Serial error: {exc}  — retrying in 3 s")
@@ -413,15 +419,24 @@ async def packet_consumer(out_q: asyncio.Queue) -> None:
     Reads from *out_q* (populated by source_mux), parses each packet, and
     calls _process_packet() to update the shared telemetry state.
     """
+    global _rx_total, _parse_ok, _parse_fail
     while True:
         raw = await out_q.get()
+        _rx_total += 1
         try:
             code, values = parse_packet(raw)
             if code in CODES:
                 _process_packet(code, values, time.monotonic())
+                _parse_ok += 1
             else:
-                log.debug(f"[CONSUMER] Malformed packet dropped: {raw!r}")
+                _parse_fail += 1
+                # Warn on first 5 bad packets, then every 100 — avoids log spam
+                if _parse_fail <= 5 or _parse_fail % 100 == 0:
+                    log.warning(
+                        f"[CONSUMER] Unrecognised packet #{_parse_fail} dropped: {raw!r}"
+                    )
         except Exception as exc:
+            _parse_fail += 1
             log.warning(f"[CONSUMER] Error processing packet {raw!r}: {exc}")
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -438,7 +453,7 @@ def _fmt_param(name: str) -> str:
 
 
 async def display_loop() -> None:
-    LINES = len(CODES) + 1
+    LINES = len(CODES) + 2   # +1 for the new diagnostics row
     sys.stdout.write("\033[?7l")    # disable line-wrap so long lines don't shift block
     sys.stdout.write("\n" * LINES)
     sys.stdout.flush()
@@ -454,6 +469,8 @@ async def display_loop() -> None:
                 "Packet Hz  │  " + "   ".join(
                     f"{c}: {_code_freq_ema.get(c, 0.0):>5.1f}Hz" for c in CODES
                 ),
+                f"Pipeline   │  RX: {_rx_total}   OK: {_parse_ok}   Drop: {_parse_fail}"
+                + ("  ← check WARNING logs" if _parse_fail > 0 and _parse_ok == 0 else ""),
             ]
             out = f"\033[{LINES}A" + "".join(f"\033[2K\r  {r[:w]}\n" for r in rows)
             sys.stdout.write(out)
