@@ -45,7 +45,8 @@ import serial
 # CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
 # Primary: Zigbee radio module connected via serial COM port
-ZIGBEE_COM_PORT  = "COM11"     # serial port the Zigbee module is on
+ZIGBEE_COM_PORT  = "/dev/ttyUSB0"     # serial port the Zigbee module is on
+#ZIGBEE_COM_PORT  = "/dev/ttyUSB0"     # serial port the Zigbee module is on
 ZIGBEE_BAUD_RATE = 115200     # must match the Zigbee module firmware
 
 # Fallback: direct UDP sender (e.g. WiFi direct from drone)

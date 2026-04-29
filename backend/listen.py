@@ -383,7 +383,7 @@ def trigger_takeoff(altitude=10.0):
 # _telem_source is the single gate: only the matching source writes JSON.
 # ══════════════════════════════════════════════════════════════════════════════
 
-ZIGBEE_COM_PORT  = "COM11"
+ZIGBEE_COM_PORT  = "/dev/ttyUSB0"
 ZIGBEE_BAUD_RATE = 115200
 ZIGBEE_TIMEOUT   = 2.0      # serial read timeout (s); empty readline → failover
 
@@ -517,9 +517,63 @@ def _ensure_udp_fallback_running() -> None:
     print("[TELEM] UDP fallback activated")
 
 
+def _extract_xbee_api_frames(buf: bytearray) -> list:
+    """
+    Parse XBee API frames (AP=1) from buf and return a list of payload strings.
+    Consumed bytes are removed from buf in-place.
+
+    Frame layout:  7E [len_hi] [len_lo] [frame_data: length bytes] [checksum]
+    checksum = 0xFF - (sum(frame_data) & 0xFF)
+
+    Supported RX frame types:
+      0x81  16-bit RX: header = frame_type(1) + src(2) + rssi(1) + opts(1) = 5 bytes
+      0x80  64-bit RX: header = frame_type(1) + src(8) + rssi(1) + opts(1) = 11 bytes
+    """
+    payloads = []
+    while True:
+        start = buf.find(0x7E)
+        if start == -1:
+            buf.clear()
+            break
+        if start:
+            del buf[:start]
+
+        if len(buf) < 4:
+            break  # need at least 7E + len(2) + 1 data byte
+
+        length = (buf[1] << 8) | buf[2]
+        frame_size = 4 + length  # 7E(1) + len(2) + data(length) + chk(1)
+        if len(buf) < frame_size:
+            break  # incomplete frame
+
+        frame_data = buf[3 : 3 + length]
+        checksum   = buf[3 + length]
+
+        if (sum(frame_data) + checksum) & 0xFF != 0xFF:
+            # Bad checksum — this 0x7E was a data byte, not a real SOF; skip it
+            del buf[:1]
+            continue
+
+        del buf[:frame_size]
+
+        ftype = frame_data[0] if frame_data else 0
+        payload_bytes = b""
+        if ftype == 0x81 and len(frame_data) >= 6:    # 16-bit RX
+            payload_bytes = bytes(frame_data[5:])
+        elif ftype == 0x80 and len(frame_data) >= 12: # 64-bit RX
+            payload_bytes = bytes(frame_data[11:])
+
+        if payload_bytes:
+            text = payload_bytes.decode("utf-8", errors="replace").strip()
+            if text:
+                payloads.append(text)
+
+    return payloads
+
+
 def zigbee_telem_thread() -> None:
     """
-    Primary telemetry source. Reads [CODE$$...##] from Zigbee serial.
+    Primary telemetry source. Reads [CODE$$...##] from Zigbee serial (XBee API mode, AP=1).
     On timeout or error: sets _telem_source="udp" and starts UDP fallback.
     On reconnect: reclaims _telem_source="zigbee" from UDP automatically.
     """
@@ -528,7 +582,7 @@ def zigbee_telem_thread() -> None:
         ser = None
         try:
             ser = serial.Serial(ZIGBEE_COM_PORT, ZIGBEE_BAUD_RATE, timeout=ZIGBEE_TIMEOUT)
-            print(f"[ZIGBEE] Opened {ZIGBEE_COM_PORT} — Zigbee telemetry active")
+            print(f"[ZIGBEE] Opened {ZIGBEE_COM_PORT} — Zigbee telemetry active (API mode)")
             with _telem_source_lock:
                 _telem_source = "zigbee"
 
@@ -545,30 +599,13 @@ def zigbee_telem_thread() -> None:
 
                 buf.extend(chunk)
 
-                # Cap buffer to prevent growth from corrupt/partial data
+                # Cap buffer to prevent unbounded growth from corrupt data
                 if len(buf) > 4096:
-                    cut = buf.rfind(ord('['))
+                    cut = buf.rfind(0x7E)
                     buf = buf[cut:] if cut != -1 else bytearray()
 
-                # XBee is in AT/transparent mode — payload arrives as raw bytes.
-                # Scan for '[' ... '##]' to extract packets, discarding any
-                # binary preamble or garbage bytes before the packet start.
-                while True:
-                    start = buf.find(ord('['))
-                    if start == -1:
-                        buf.clear()
-                        break
-                    if start:
-                        del buf[:start]
-
-                    end = buf.find(b'##]')
-                    if end == -1:
-                        break   # incomplete packet — wait for more bytes
-
-                    end_idx = end + 3   # len('##]') == 3
-                    text = buf[:end_idx].decode("utf-8", errors="replace").strip()
-                    del buf[:end_idx]
-
+                # Parse XBee API frames and extract telemetry payloads
+                for text in _extract_xbee_api_frames(buf):
                     # Packet received — reclaim source from UDP if needed
                     with _telem_source_lock:
                         if _telem_source == "udp":
