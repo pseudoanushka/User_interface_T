@@ -1,23 +1,5 @@
 {
-    "mavpackettype": "BATTERY_STATUS",
-    "id": 0,
-    "battery_function": 1,
-    "type": 1,
-    "temperature": 32767,
-    "voltages": [
-        14150,
-        65535,
-        65535,
-        65535,
-        65535,
-        65535,
-        65535,
-        65535,
-        65535,
-        65535
-    ],
-    "current_battery": 0,
-    "current_consumed": 0,
-    "energy_consumed": -1,
-    "battery_remaining": 45
+    "voltage": 0.0,
+    "current": 0.0,
+    "percent": 0
 }

@@ -17,8 +17,6 @@ Public entry point (called by listen.py):
   run_udp_only()   — blocking; run in a daemon thread
 """
 
-import json
-import math
 import os
 import socket
 import sys
@@ -144,63 +142,15 @@ def _display_loop() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DIRECT JSON WRITE  (standalone mode — bypasses listen.py gate)
-# ─────────────────────────────────────────────────────────────────────────────
-_write_lock = Lock()
-
-
-def _write_file(path: str, data: dict) -> None:
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with _write_lock:
-            with open(path, "w") as f:
-                json.dump(data, f, indent=4)
-    except Exception as e:
-        log.error(f"[UDP] JSON write failed {path}: {e}")
-
-
-def _write_json_direct(code: str, values: list) -> None:
-    if code == "A" and len(values) == 9:
-        _write_file(os.path.join(_PARAMS_DIR, "ATTITUDE.json"), {
-            "mavpackettype": "ATTITUDE",
-            "roll":       math.radians(values[0]),
-            "pitch":      math.radians(values[1]),
-            "yaw":        math.radians(values[2]),
-            "rollspeed":  0.0, "pitchspeed": 0.0, "yawspeed": 0.0,
-        })
-        _write_file(os.path.join(_PARAMS_DIR, "LOCAL_POSITION_NED.json"), {
-            "mavpackettype": "LOCAL_POSITION_NED",
-            "x": values[3], "y": values[4], "z": values[5],
-            "vx": values[6], "vy": values[7], "vz": values[8],
-        })
-    elif code == "B" and len(values) == 3:
-        _write_file(os.path.join(_PARAMS_DIR, "BATTERY_STATUS.json"), {
-            "mavpackettype":     "BATTERY_STATUS",
-            "voltages":          [int(values[0] * 1000)] + [65535] * 9,
-            "current_battery":   int(values[2] * 100),
-            "battery_remaining": int(values[1]),
-        })
-    elif code == "D" and len(values) == 3:
-        _write_file(os.path.join(_PARAMS_DIR, "DISTANCE_SENSOR.json"), {
-            "mavpackettype":    "DISTANCE_SENSOR",
-            "current_distance": int(values[0] * 100),
-            "rpi_temp":         round(values[1], 1),
-            "imu_temp":         round(values[2], 1),
-        })
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 # ENTRY POINT  (called by listen._ensure_udp_fallback_running)
 # ─────────────────────────────────────────────────────────────────────────────
-def run_udp_only(_direct: bool = False) -> None:
+def run_udp_only() -> None:
     """
     Blocking UDP receiver.
-      _direct=False  — called by listen.py; forwards to listen.process_telem_packet()
-                        so listen's source gate controls JSON writes.
-      _direct=True   — standalone mode; writes JSON directly to public/params/.
+    Forwards parsed packets to listen.process_telem_packet(); listen.py owns
+    the source gate and is the only writer of telemetry JSON files.
     """
-    if not _direct:
-        import listen   # late import — listen is already loaded when this runs
+    import listen   # late import — listen is already loaded when this runs
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(1.0)
@@ -220,10 +170,7 @@ def run_udp_only(_direct: bool = False) -> None:
             if code in CODES:
                 hz = _update_code_freq(code, t)
                 _update_display_state(code, values, hz)
-                if _direct:
-                    _write_json_direct(code, values)
-                else:
-                    listen.process_telem_packet(code, values, "udp")
+                listen.process_telem_packet(code, values, "udp")
         except socket.timeout:
             pass   # no packet — keep looping
         except Exception as e:
@@ -232,10 +179,9 @@ def run_udp_only(_direct: bool = False) -> None:
 
 if __name__ == "__main__":
     import threading
-    print(f"  UDP telemetry fallback (standalone mode — port {UDP_PORT})")
-    print(f"  Writing JSON to: {_PARAMS_DIR}")
+    print(f"  UDP telemetry fallback (port {UDP_PORT})")
     print("  " + "─" * 60)
     threading.Thread(target=_display_loop, daemon=True).start()
-    run_udp_only(_direct=True)
+    run_udp_only()
 
 #working good

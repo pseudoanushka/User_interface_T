@@ -10,8 +10,7 @@ from typing import Optional
 from pymavlink import mavutil
 from threading import Lock
 import threading
-from typing import Dict, List
-
+from typing import Dict,List
 BS_UDP_IP = "0.0.0.0"
 BS_UDP_PORT = 5007
 
@@ -217,7 +216,7 @@ latest_data = {
 }
 
 # ================= CONFIG =================
-COM_PORT = "/dev/ttyUSB0"
+COM_PORT = "COM13"          # MAVLink flight controller (Windows); Linux: /dev/ttyUSB0
 BAUD = 115200
 PARAMS_DIR = os.path.join(_BASE_DIR, "public", "params")
 
@@ -290,6 +289,8 @@ def _safe_float(val, fallback: float = 0.0) -> float:
         return fallback
 
 def save_message_to_json(msg):
+    if msg.get_type() in ["ATTITUDE", "LOCAL_POSITION_NED", "BATTERY_STATUS", "DISTANCE_SENSOR"]:
+        return
     try:
         file_path = os.path.join(PARAMS_DIR, f"{msg.get_type()}.json")
         with open(file_path, "w", encoding="utf-8") as f:
@@ -382,7 +383,7 @@ def trigger_takeoff(altitude=10.0):
 # _telem_source is the single gate: only the matching source writes JSON.
 # ══════════════════════════════════════════════════════════════════════════════
 
-ZIGBEE_COM_PORT  = "/dev/ttyUSB0"
+ZIGBEE_COM_PORT  = "COM11"
 ZIGBEE_BAUD_RATE = 115200
 ZIGBEE_TIMEOUT   = 2.0      # serial read timeout (s); empty readline → failover
 
@@ -394,6 +395,17 @@ _TELEM_DISTANCE_JSON = os.path.join(_BASE_DIR, "public", "params", "DISTANCE_SEN
 _telem_source      = "zigbee"   # "zigbee" → listen.py writes  |  "udp" → udp_telem_reciever writes
 _telem_source_lock = Lock()
 _telem_json_lock   = Lock()
+
+_telem_state_lock = Lock()
+
+_telem_state = {
+    "attitude": {"roll": 0.0, "pitch": 0.0, "yaw": 0.0},
+    "position": {"x": 0.0, "y": 0.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+    "battery": {"voltage": 0.0, "current": 0.0, "percent": 0},
+    "distance": {"distance": 0.0, "rpi_temp": 0.0, "imu_temp": 0.0},
+    "source": "zigbee",
+    "last_update": 0.0
+}
 
 _TELEM_CODES = ["A", "B", "D"]
 
@@ -424,42 +436,66 @@ def _write_telem_json(path: str, data: dict) -> None:
 
 def process_telem_packet(code: str, values: list, source: str) -> None:
     """
-    Write telemetry JSON. Gate: only the active source may write.
+    Update central telemetry state. Gate: only the active source may update.
       source="zigbee" → called by zigbee_telem_thread (this file)
       source="udp"    → called by udp_telem_reciever.run_udp_only
     """
     with _telem_source_lock:
         active = _telem_source
-    if source != active:
-        return   # other source is active — skip
 
-    if code == "A" and len(values) == 9:
-        _write_telem_json(_TELEM_ATTITUDE_JSON, {
-            "mavpackettype": "ATTITUDE",
-            "roll":       math.radians(values[0]),
-            "pitch":      math.radians(values[1]),
-            "yaw":        math.radians(values[2]),
-            "rollspeed":  0.0, "pitchspeed": 0.0, "yawspeed": 0.0,
-        })
-        _write_telem_json(_TELEM_POSITION_JSON, {
-            "mavpackettype": "LOCAL_POSITION_NED",
-            "x":  values[3], "y":  values[4], "z":  values[5],
-            "vx": values[6], "vy": values[7], "vz": values[8],
-        })
-    elif code == "B" and len(values) == 3:
-        _write_telem_json(_TELEM_BATTERY_JSON, {
-            "mavpackettype":     "BATTERY_STATUS",
-            "voltages":          [int(_safe_float(values[0]) * 1000)] + [65535] * 9,
-            "current_battery":   int(_safe_float(values[2]) * 100),
-            "battery_remaining": int(_safe_float(values[1])),
-        })
-    elif code == "D" and len(values) == 3:
-        _write_telem_json(_TELEM_DISTANCE_JSON, {
-            "mavpackettype":    "DISTANCE_SENSOR",
-            "current_distance": int(_safe_float(values[0]) * 100),
-            "rpi_temp":         round(_safe_float(values[1]), 1),
-            "imu_temp":         round(_safe_float(values[2]), 1),
-        })
+    if source != active:
+        return
+
+    with _telem_state_lock:
+        _telem_state["source"] = source
+        _telem_state["last_update"] = time.time()
+
+        if code == "A" and len(values) == 9:
+            _telem_state["attitude"] = {
+                "roll": math.radians(values[0]),
+                "pitch": math.radians(values[1]),
+                "yaw": math.radians(values[2]),
+            }
+            _telem_state["position"] = {
+                "x": values[3], "y": values[4], "z": values[5],
+                "vx": values[6], "vy": values[7], "vz": values[8],
+            }
+
+        elif code == "B" and len(values) == 3:
+            _telem_state["battery"] = {
+                "voltage": _safe_float(values[0]),
+                "current": _safe_float(values[2]),
+                "percent": int(_safe_float(values[1]))
+            }
+
+        elif code == "D" and len(values) == 3:
+            _telem_state["distance"] = {
+                "distance": _safe_float(values[0]),
+                "rpi_temp": round(_safe_float(values[1]), 1),
+                "imu_temp": round(_safe_float(values[2]), 1),
+            }
+
+
+def _safe_write(path: str, data: dict):
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=4)
+    os.replace(tmp, path)
+
+
+def json_writer_loop():
+    base = os.path.join(_BASE_DIR, "public", "params")
+
+    while True:
+        with _telem_state_lock:
+            state = dict(_telem_state)
+
+        _safe_write(os.path.join(base, "ATTITUDE.json"), state["attitude"])
+        _safe_write(os.path.join(base, "LOCAL_POSITION_NED.json"), state["position"])
+        _safe_write(os.path.join(base, "BATTERY_STATUS.json"), state["battery"])
+        _safe_write(os.path.join(base, "DISTANCE_SENSOR.json"), state["distance"])
+
+        time.sleep(0.1)
 
 
 _udp_fallback_started = False
@@ -496,26 +532,52 @@ def zigbee_telem_thread() -> None:
             with _telem_source_lock:
                 _telem_source = "zigbee"
 
+            buf = bytearray()
             while True:
-                line = ser.readline()
-                if not line:
-                    # readline timeout — no packet within ZIGBEE_TIMEOUT seconds
+                chunk = ser.read(256)   # blocks up to ZIGBEE_TIMEOUT; b"" on timeout
+                if not chunk:
                     print("[ZIGBEE] Packet timeout — handing over to UDP")
                     with _telem_source_lock:
                         _telem_source = "udp"
                     _ensure_udp_fallback_running()
-                    continue   # keep polling; reclaim when signal returns
+                    time.sleep(0.05)   # prevent busy-spin while waiting for signal
+                    continue
 
-                # packet received — reclaim permission if UDP was active
-                with _telem_source_lock:
-                    if _telem_source == "udp":
-                        print("[ZIGBEE] Signal restored — reclaiming from UDP")
-                        _telem_source = "zigbee"
+                buf.extend(chunk)
 
-                text = line.decode("utf-8", errors="replace").strip()
-                code, values = _parse_telem_packet(text)
-                if code in _TELEM_CODES:
-                    process_telem_packet(code, values, "zigbee")
+                # Cap buffer to prevent growth from corrupt/partial data
+                if len(buf) > 4096:
+                    cut = buf.rfind(ord('['))
+                    buf = buf[cut:] if cut != -1 else bytearray()
+
+                # XBee is in AT/transparent mode — payload arrives as raw bytes.
+                # Scan for '[' ... '##]' to extract packets, discarding any
+                # binary preamble or garbage bytes before the packet start.
+                while True:
+                    start = buf.find(ord('['))
+                    if start == -1:
+                        buf.clear()
+                        break
+                    if start:
+                        del buf[:start]
+
+                    end = buf.find(b'##]')
+                    if end == -1:
+                        break   # incomplete packet — wait for more bytes
+
+                    end_idx = end + 3   # len('##]') == 3
+                    text = buf[:end_idx].decode("utf-8", errors="replace").strip()
+                    del buf[:end_idx]
+
+                    # Packet received — reclaim source from UDP if needed
+                    with _telem_source_lock:
+                        if _telem_source == "udp":
+                            print("[ZIGBEE] Signal restored — reclaiming from UDP")
+                            _telem_source = "zigbee"
+
+                    code, values = _parse_telem_packet(text)
+                    if code in _TELEM_CODES:
+                        process_telem_packet(code, values, "zigbee")
 
         except serial.SerialException as e:
             print(f"[ZIGBEE] Serial error: {e} — handing over to UDP, retrying in 3s")
@@ -540,6 +602,7 @@ def main():
     threading.Thread(target=read_arduino_thread, daemon=True).start()
     # Zigbee telemetry thread (primary; falls over to UDP automatically on failure)
     threading.Thread(target=zigbee_telem_thread, daemon=True, name="zigbee-telem").start()
+    threading.Thread(target=json_writer_loop, daemon=True).start()
     print(f"Attempting to connect to MAVLink hardware on {COM_PORT}...")
     while True:
         try:

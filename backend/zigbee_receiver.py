@@ -45,7 +45,7 @@ import serial
 # CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
 # Primary: Zigbee radio module connected via serial COM port
-ZIGBEE_COM_PORT  = "/dev/ttyUSB0"     # serial port the Zigbee module is on
+ZIGBEE_COM_PORT  = "COM11"     # serial port the Zigbee module is on
 ZIGBEE_BAUD_RATE = 115200     # must match the Zigbee module firmware
 
 # Fallback: direct UDP sender (e.g. WiFi direct from drone)
@@ -156,6 +156,7 @@ _param_values: dict    = {}
 _rx_total:    int = 0   # raw lines received from active source
 _parse_ok:    int = 0   # packets recognised and applied to state
 _parse_fail:  int = 0   # packets dropped (malformed / unknown code)
+_last_bad:    str = ""  # hex of most recent dropped payload bytes
 
 
 def _update_code_freq(code: str, t: float) -> float:
@@ -255,34 +256,82 @@ def _process_packet(code: str, values: list, t: float) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 async def read_from_zigbee(queue: asyncio.Queue) -> None:
     """
-    Reads lines from the Zigbee radio module via serial COM port and puts
-    (raw_str, monotonic_timestamp) tuples into *queue*.
+    Reads XBee API frames from the Zigbee radio and puts
+    (payload_str, monotonic_timestamp) tuples into *queue*.
 
-    Uses run_in_executor so the blocking serial.readline() never stalls the
-    event loop.  The serial port's own read timeout (1 s) ensures readline
-    returns promptly even when the drone is silent, so the mux can detect
-    the silence and trigger failover.
+    XBee API frame layout (AP=1):
+        7E  [len_hi]  [len_lo]  [frame_data: length bytes]  [checksum]
+        total frame size = 4 + length
+        checksum = 0xFF - (sum(frame_data) & 0xFF)
+
+    Receive frame types carrying drone telemetry:
+        0x81  RX 16-bit address: 7E len_hi len_lo 81 src_hi src_lo rssi opts [payload...] chk
+        0x80  RX 64-bit address: 7E len_hi len_lo 80 [8 addr bytes] rssi opts [payload...] chk
+
+    The payload is whatever the drone's transmitting XBee sent — the
+    ASCII [CODE$$v1,...##] telemetry string.
 
     Runs forever with auto-reconnect on serial errors (e.g. USB unplug).
+    The per-read timeout (1 s) lets the mux detect silence and failover.
     """
     loop = asyncio.get_running_loop()
     while True:
         ser = None
+        buf = bytearray()
         try:
             ser = serial.Serial(ZIGBEE_COM_PORT, ZIGBEE_BAUD_RATE, timeout=1.0)
             log.info(f"[ZIGBEE] Opened {ZIGBEE_COM_PORT} @ {ZIGBEE_BAUD_RATE} baud")
             while True:
-                # readline blocks for at most 1 s (serial timeout), then returns b""
-                line = await loop.run_in_executor(None, ser.readline)
-                if not line:
-                    continue   # serial timeout — no data this second, loop again
-                ts   = time.monotonic()
-                text = line.decode("utf-8", errors="replace").strip()
-                if text:
-                    log.debug(f"[ZIGBEE] RAW: {text!r}")
-                    await queue.put((text, ts))
+                chunk = await loop.run_in_executor(None, ser.read, 256)
+                if not chunk:
+                    continue   # serial timeout — no bytes this second
+                buf.extend(chunk)
+
+                # Drain all complete XBee API frames from the buffer
+                while True:
+                    start = buf.find(0x7E)
+                    if start == -1:
+                        buf.clear()
+                        break
+                    if start:
+                        del buf[:start]   # discard bytes before frame start
+
+                    if len(buf) < 4:
+                        break   # need 7E + len_hi + len_lo + at least 1 data byte
+                    length     = (buf[1] << 8) | buf[2]
+                    frame_size = 4 + length   # 7E(1) + len(2) + data(length) + chk(1)
+                    if len(buf) < frame_size:
+                        break   # incomplete frame — wait for more bytes
+
+                    frame_data = buf[3 : 3 + length]
+                    checksum   = buf[3 + length]
+
+                    if (sum(frame_data) + checksum) & 0xFF != 0xFF:
+                        # Bad checksum — this 0x7E was a data byte, not a real SOF
+                        del buf[:1]
+                        continue
+
+                    del buf[:frame_size]
+
+                    ftype = frame_data[0] if frame_data else 0
+                    payload_bytes = b""
+                    if ftype == 0x81 and len(frame_data) >= 6:    # 16-bit RX
+                        payload_bytes = bytes(frame_data[5:])
+                    elif ftype == 0x80 and len(frame_data) >= 12: # 64-bit RX
+                        payload_bytes = bytes(frame_data[11:])
+                    # non-RX frame types (modem status, TX status) carry no telemetry
+
+                    if not payload_bytes:
+                        continue
+
+                    text = payload_bytes.decode("utf-8", errors="replace").strip()
+                    if text:
+                        log.debug(f"[ZIGBEE] XBEE RX: {text!r}")
+                        await queue.put((text, time.monotonic()))
+
         except serial.SerialException as exc:
             log.error(f"[ZIGBEE] Serial error: {exc}  — retrying in 3 s")
+            buf.clear()
             await asyncio.sleep(3.0)
         except asyncio.CancelledError:
             raise
@@ -419,7 +468,7 @@ async def packet_consumer(out_q: asyncio.Queue) -> None:
     Reads from *out_q* (populated by source_mux), parses each packet, and
     calls _process_packet() to update the shared telemetry state.
     """
-    global _rx_total, _parse_ok, _parse_fail
+    global _rx_total, _parse_ok, _parse_fail, _last_bad
     while True:
         raw = await out_q.get()
         _rx_total += 1
@@ -430,13 +479,14 @@ async def packet_consumer(out_q: asyncio.Queue) -> None:
                 _parse_ok += 1
             else:
                 _parse_fail += 1
-                # Warn on first 5 bad packets, then every 100 — avoids log spam
+                _last_bad = raw.encode("utf-8", errors="replace").hex()
                 if _parse_fail <= 5 or _parse_fail % 100 == 0:
                     log.warning(
                         f"[CONSUMER] Unrecognised packet #{_parse_fail} dropped: {raw!r}"
                     )
         except Exception as exc:
             _parse_fail += 1
+            _last_bad = raw.encode("utf-8", errors="replace").hex()
             log.warning(f"[CONSUMER] Error processing packet {raw!r}: {exc}")
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -453,7 +503,7 @@ def _fmt_param(name: str) -> str:
 
 
 async def display_loop() -> None:
-    LINES = len(CODES) + 2   # +1 for the new diagnostics row
+    LINES = len(CODES) + 3   # diagnostics row + last-bad row
     sys.stdout.write("\033[?7l")    # disable line-wrap so long lines don't shift block
     sys.stdout.write("\n" * LINES)
     sys.stdout.flush()
@@ -469,8 +519,8 @@ async def display_loop() -> None:
                 "Packet Hz  │  " + "   ".join(
                     f"{c}: {_code_freq_ema.get(c, 0.0):>5.1f}Hz" for c in CODES
                 ),
-                f"Pipeline   │  RX: {_rx_total}   OK: {_parse_ok}   Drop: {_parse_fail}"
-                + ("  ← check WARNING logs" if _parse_fail > 0 and _parse_ok == 0 else ""),
+                f"Pipeline   │  RX: {_rx_total}   OK: {_parse_ok}   Drop: {_parse_fail}",
+                f"Last bad   │  {_last_bad!r}" if _last_bad else "Last bad   │  (none yet)",
             ]
             out = f"\033[{LINES}A" + "".join(f"\033[2K\r  {r[:w]}\n" for r in rows)
             sys.stdout.write(out)
