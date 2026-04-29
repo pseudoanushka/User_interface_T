@@ -108,11 +108,10 @@ def _set_active_source(src: Source) -> None:
     global _active_source
     with _source_lock:
         prev = _active_source
-    if prev == src:
-        return
-    log.info(f"[SOURCE] {prev.value} → {src.value}")
-    with _source_lock:
+        if prev == src:
+            return
         _active_source = src
+    log.info(f"[SOURCE] {prev.value} → {src.value}")
     with _state_lock:
         _state["source"] = src.value
 
@@ -416,11 +415,14 @@ async def packet_consumer(out_q: asyncio.Queue) -> None:
     """
     while True:
         raw = await out_q.get()
-        code, values = parse_packet(raw)
-        if code in CODES:
-            _process_packet(code, values, time.monotonic())
-        else:
-            log.debug(f"[CONSUMER] Malformed packet dropped: {raw!r}")
+        try:
+            code, values = parse_packet(raw)
+            if code in CODES:
+                _process_packet(code, values, time.monotonic())
+            else:
+                log.debug(f"[CONSUMER] Malformed packet dropped: {raw!r}")
+        except Exception as exc:
+            log.warning(f"[CONSUMER] Error processing packet {raw!r}: {exc}")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TERMINAL DISPLAY  (optional, 20 Hz)
@@ -472,27 +474,32 @@ async def run() -> None:
                                           ├─→ source_mux ──→ out_q ──→ packet_consumer
          read_from_udp     ──→ udp_q    ─┘
 
-    All tasks share a single event loop.  If any task raises an unhandled
-    exception the remaining tasks are cancelled and the program exits cleanly.
+    Restarts the pipeline automatically if any task raises an unhandled
+    exception (e.g. a driver crash), with a 1-second back-off.
     """
-    zigbee_q: asyncio.Queue = asyncio.Queue(maxsize=64)
-    udp_q:    asyncio.Queue = asyncio.Queue(maxsize=64)
-    out_q:    asyncio.Queue = asyncio.Queue(maxsize=128)
+    while True:
+        zigbee_q: asyncio.Queue = asyncio.Queue(maxsize=64)
+        udp_q:    asyncio.Queue = asyncio.Queue(maxsize=64)
+        out_q:    asyncio.Queue = asyncio.Queue(maxsize=128)
 
-    tasks = [
-        asyncio.create_task(read_from_zigbee(zigbee_q),              name="zigbee-reader"),
-        asyncio.create_task(read_from_udp(udp_q),                    name="udp-reader"),
-        asyncio.create_task(source_mux(zigbee_q, udp_q, out_q),      name="source-mux"),
-        asyncio.create_task(packet_consumer(out_q),                   name="consumer"),
-        asyncio.create_task(display_loop(),                           name="display"),
-    ]
-    try:
-        await asyncio.gather(*tasks)
-    except Exception as exc:
-        log.error(f"Fatal error in ingestion pipeline: {exc}")
-    finally:
-        for t in tasks:
-            t.cancel()
+        tasks = [
+            asyncio.create_task(read_from_zigbee(zigbee_q),              name="zigbee-reader"),
+            asyncio.create_task(read_from_udp(udp_q),                    name="udp-reader"),
+            asyncio.create_task(source_mux(zigbee_q, udp_q, out_q),      name="source-mux"),
+            asyncio.create_task(packet_consumer(out_q),                   name="consumer"),
+            asyncio.create_task(display_loop(),                           name="display"),
+        ]
+        try:
+            await asyncio.gather(*tasks)
+        except asyncio.CancelledError:
+            raise   # propagate keyboard-interrupt / external cancel
+        except Exception as exc:
+            log.error(f"Fatal error in ingestion pipeline: {exc}  — restarting in 1 s")
+        finally:
+            for t in tasks:
+                t.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.sleep(1.0)
 
 
 def main() -> None:
