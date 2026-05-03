@@ -486,6 +486,23 @@ def _fetch_rpi_json(path: str, timeout: float = 1.0):
     except Exception:
         return None
 
+_ALLOWED_DRONE_COMMANDS = {"arm", "takeoff", "land", "disarm", "kill"}
+
+def _send_rpi_command(command: str, timeout: float = 2.0):
+    """Forward an operator command to the RPi FastAPI server."""
+    url = f"http://{RPI_IP}:{RPI_PORT}/{command}"
+    try:
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode()
+            try:
+                payload = json.loads(body) if body else {}
+            except Exception:
+                payload = {"raw": body}
+            return True, resp.status, payload
+    except Exception as e:
+        return False, 502, {"error": str(e)}
+
 # Cache the last known RPi telemetry so the endpoint doesn't block forever
 _rpi_telemetry_cache: dict = {}
 _rpi_telemetry_lock = threading.Lock()
@@ -628,6 +645,33 @@ def rpi_phase():
         data = dict(_rpi_telemetry_cache)
     phase = _compute_phase(data) if data else "OFFLINE"
     return jsonify({"phase": phase, "telemetry": data})
+
+@app.route("/drone/control/<command>", methods=["POST"])
+def drone_control(command):
+    """
+    Frontend -> GCS backend -> RPi: operator drone controls.
+    Accepted commands: arm, takeoff, land, disarm, kill.
+    """
+    command = command.lower()
+    if command not in _ALLOWED_DRONE_COMMANDS:
+        return jsonify({"success": False, "error": f"Unsupported command '{command}'"}), 400
+
+    ok, status, payload = _send_rpi_command(command)
+    response = {
+        "success": ok,
+        "command": command,
+        "rpi_status": status,
+        "rpi_response": payload,
+    }
+
+    if command == "land":
+        _write_charging_status(True, "manual", relay_armed=True)
+        relay_ok = listen.send_arduino_cmd("landed")
+        response["base_station_relay_armed"] = relay_ok
+        if relay_ok:
+            _write_charging_status(True, "manual", relay_armed=True, relay_triggered=True)
+
+    return jsonify(response), 200 if ok else 502
 
 @app.route("/bs/landed", methods=["POST"])
 def bs_landed():
