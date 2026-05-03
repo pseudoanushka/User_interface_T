@@ -1,4 +1,4 @@
-import { getBaseUrl } from "../config";
+import { getBaseUrl, getRpiUrl } from "../config";
 
 const controls = [
   { label: "ARM", title: "Arm", action: "arm", className: "arm" },
@@ -11,8 +11,9 @@ const controls = [
 export function DroneControlMiniPanel() {
   const sendCommand = async (control: (typeof controls)[number]) => {
     try {
-      await fetch(`${getBaseUrl()}/drone/control/${control.action}`, { method: "POST" });
+      await fetch(`${getRpiUrl()}/${control.action}`, { method: "GET" });
       if (control.event) window.dispatchEvent(new Event(control.event));
+      if (control.action === "land") fetch(`${getBaseUrl()}/bs/landed`, { method: "POST" }).catch(() => {});
     } catch {
       // Keep this panel quiet; the failsafe/status areas carry operator feedback.
     }
