@@ -393,6 +393,157 @@ canvas {
   color: #94a3b8;
 }
 
+/* =============================== CAMERA STACK =============================== */
+.camera-feed-stack {
+  position: fixed;
+  top: 0;
+  left: calc(100vw * 2 / 6);
+  width: 400px;
+  height: 590px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  background: transparent;
+  border: none;
+  box-sizing: border-box;
+}
+
+.camera-top-row {
+  width: 400px;
+  height: 90px;
+  display: flex;
+  align-items: stretch;
+  box-sizing: border-box;
+}
+
+.camera-top-row > .mdp-root {
+  position: relative !important;
+  inset: auto !important;
+  width: 280px !important;
+  height: 90px !important;
+  transform: none !important;
+  box-sizing: border-box;
+}
+
+.camera-feed-stack > .gcs-root {
+  position: relative !important;
+  inset: auto !important;
+  width: 200px !important;
+  height: 500px !important;
+  transform: none !important;
+  box-sizing: border-box;
+}
+
+.drone-mini-controls {
+  position: relative;
+  width: 120px;
+  height: 90px;
+  display: grid;
+  grid-template-rows: repeat(5, 1fr);
+  gap: 1px;
+  padding: 4px;
+  background:
+    linear-gradient(180deg, rgba(3, 12, 20, 0.98), rgba(0, 0, 0, 0.98));
+  border: 1px solid rgba(34, 211, 238, 0.45);
+  border-left: none;
+  box-shadow:
+    inset 0 0 14px rgba(34, 211, 238, 0.08),
+    0 0 10px rgba(34, 211, 238, 0.1);
+  box-sizing: border-box;
+}
+
+.drone-mini-controls::before,
+.drone-mini-controls::after {
+  content: '';
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.85), transparent);
+  opacity: 0.65;
+}
+
+.drone-mini-controls::before {
+  top: 3px;
+}
+
+.drone-mini-controls::after {
+  bottom: 3px;
+}
+
+.drone-mini-btn {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0 6px 0 13px;
+  border: 1px solid rgba(30, 64, 82, 0.7);
+  border-radius: 2px;
+  background: rgba(2, 6, 23, 0.72);
+  color: #94a3b8;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  cursor: pointer;
+  text-align: left;
+  text-shadow: 0 0 7px currentColor;
+  transition: background 0.15s, border-color 0.15s, filter 0.15s;
+}
+
+.drone-mini-btn::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 3px;
+  bottom: 3px;
+  width: 3px;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+  opacity: 0.85;
+}
+
+.drone-mini-btn:last-child {
+  border-bottom: none;
+}
+
+.drone-mini-btn:hover {
+  filter: brightness(1.35);
+  background: rgba(15, 23, 42, 0.9);
+  border-color: currentColor;
+}
+
+.drone-mini-btn.arm {
+  color: #4ade80;
+}
+
+.drone-mini-btn.takeoff {
+  color: #60a5fa;
+}
+
+.drone-mini-btn.land {
+  color: #f59e0b;
+}
+
+.drone-mini-btn.disarm {
+  color: #f87171;
+}
+
+.drone-mini-btn.kill {
+  background:
+    linear-gradient(90deg, rgba(127, 29, 29, 0.9), rgba(2, 6, 23, 0.9));
+  border-color: rgba(248, 113, 113, 0.7);
+  color: #fecaca;
+}
+
+.drone-mini-btn.kill::before {
+  width: 4px;
+  background: #ef4444;
+  box-shadow: 0 0 10px #ef4444;
+}
+
 /* =============================== RESULTANT VELOCITY WIDGET =============================== */
 .ah-rv-widget {
   color: #e2e8f0;
