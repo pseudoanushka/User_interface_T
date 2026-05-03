@@ -5,8 +5,8 @@ import { Compass } from "./Compass";
 import { BatteryIndicator } from "./BatteryIndicator";
 import { VelocityVectors } from "./VelocityVectors";
 import { CameraFeed } from "./CameraFeed";
-import { ChargingStatusPanel } from "./ChargingStatusPanel";
 import { MissionDataPanel } from "./MissionDataPanel";
+import { DroneControlMiniPanel } from "./DroneControlMiniPanel";
 import { FailsafePanel } from "./FailsafePanel";
 import titansLogo from "./Titans_logo_white.png";
 import { getBaseUrl } from "../config";
@@ -51,9 +51,14 @@ export default function CockpitDashboard({ data, socket: _socket }: { data: Tele
 
   return (
     <>
-      <CameraFeed />
-      <ChargingStatusPanel data={data.arduino} />
-      
+      <div className="camera-feed-stack">
+        <div className="camera-top-row">
+          <MissionDataPanel compact />
+          <DroneControlMiniPanel />
+        </div>
+        <CameraFeed />
+      </div>
+
       {/* Logos & Overlays in remaining 1/3 viewport space */}
       <div style={{
           position: 'fixed',
@@ -69,11 +74,6 @@ export default function CockpitDashboard({ data, socket: _socket }: { data: Tele
         <img src={titansLogo} alt="Titans Logo" style={{ maxWidth: '85%', maxHeight: '85%', objectFit: 'contain', opacity: 0.95 }} />
       </div>
 
-      <MissionDataPanel />
-      
-      {/* Bottom failsafe panel */}
-      <FailsafePanel />
-
       <div className="cockpit-container">
         <div className="cockpit-grid">
           <div className="attitude-container">
@@ -85,6 +85,8 @@ export default function CockpitDashboard({ data, socket: _socket }: { data: Tele
               dronePhase={dronePhase}
             >
               {/* Embedded Widgets for Four-Corner Layout */}
+              <FailsafePanel />
+
               <div className="widget-corner top-left">
                 <Compass heading={data.attitude.yaw} />
               </div>
