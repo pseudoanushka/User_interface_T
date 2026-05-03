@@ -10,7 +10,7 @@ const styles = `
     position: fixed;
     right: 0;
     top: 35%;
-    width: 29%;
+    width: 69%;
     height: 25%;
     z-index: 50;
     display: flex;
@@ -23,6 +23,83 @@ const styles = `
     font-family: 'Rajdhani', sans-serif;
     overflow: hidden;
     padding-bottom: 8px;
+  }
+
+  .mdp-root.mdp-compact {
+    position: relative;
+    right: auto;
+    top: auto;
+    width: 280px;
+    height: 90px;
+    z-index: 4;
+    border-radius: 0;
+    background:
+      linear-gradient(180deg, rgba(3, 12, 20, 0.98), rgba(0, 0, 0, 0.98));
+    border: 1px solid rgba(34, 211, 238, 0.45);
+    box-shadow:
+      inset 0 0 14px rgba(34, 211, 238, 0.08),
+      0 0 10px rgba(34, 211, 238, 0.1);
+    padding-bottom: 0;
+  }
+
+  .mdp-root.mdp-compact::after {
+    content: '';
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 7px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #22d3ee, transparent);
+    opacity: 0.75;
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.75);
+  }
+
+  .mdp-root.mdp-compact.mdp-compact-running::after {
+    animation: mdp-scan-pulse 1s ease-in-out infinite;
+  }
+
+  @keyframes mdp-scan-pulse {
+    50% { opacity: 0.22; transform: scaleX(0.72); }
+  }
+
+  .mdp-root.mdp-compact .mdp-header {
+    padding: 5px 6px 3px;
+    border-bottom: none;
+    background: transparent;
+  }
+
+  .mdp-root.mdp-compact .mdp-title {
+    font-size: 12px;
+    letter-spacing: 1.4px;
+    color: #7dd3fc;
+  }
+
+  .mdp-root.mdp-compact .mdp-badge {
+    font-size: 12px;
+    padding: 1px 3px;
+    letter-spacing: 0.8px;
+  }
+
+  .mdp-root.mdp-compact .mdp-timer-block {
+    padding: 1px 6px 0;
+    gap: 2px;
+  }
+
+  .mdp-root.mdp-compact .mdp-timer-label {
+    font-size: 12px;
+    letter-spacing: 1.2px;
+    color: #64748b;
+  }
+
+  .mdp-root.mdp-compact .mdp-timer-display {
+    font-size: 21px;
+    letter-spacing: 1px;
+    color: #f87171;
+    text-shadow: 0 0 8px rgba(248, 113, 113, 0.4);
+  }
+
+  .mdp-root.mdp-compact .mdp-btn-row {
+    display: none;
   }
 
   /* ── Header ── */
@@ -347,7 +424,7 @@ const TABLE_COLS = [
 ];
 
 /* ─── Component ─────────────────────────────────────────────────────────── */
-export function MissionDataPanel() {
+export function MissionDataPanel({ compact = false }: { compact?: boolean }) {
   const [state, setState] = useState<MissionState>('idle');
   const [timerValue, setTimerValue] = useState(0);
   const [rowsLogged, setRowsLogged] = useState(0);
@@ -566,17 +643,17 @@ export function MissionDataPanel() {
   return (
     <>
       <style>{styles}</style>
-      <div className="mdp-root">
+      <div className={`mdp-root${compact ? ` mdp-compact mdp-compact-${state}` : ''}`}>
 
         {/* Header */}
         <div className="mdp-header">
-          <div className="mdp-title">MISSION TIMER</div>
+          <div className="mdp-title">{compact ? 'FLT TIME' : 'MISSION TIMER'}</div>
           <div className={`mdp-badge ${badgeCls}`}>{badgeLabel}</div>
         </div>
 
         {/* Mission Timer */}
         <div className="mdp-timer-block">
-          <div className="mdp-timer-label">MISSION STOPWATCH</div>
+          <div className="mdp-timer-label">{compact ? 'MISSION CLOCK' : 'MISSION STOPWATCH'}</div>
           <div className={`mdp-timer-display ${timerClass()}`}>{fmt(timerValue)}</div>
           <div className="mdp-btn-row">
             <button
