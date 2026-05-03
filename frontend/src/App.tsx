@@ -58,10 +58,12 @@ export default function App() {
         const rpi = tel.RPI && Object.keys(tel.RPI).length > 0 ? tel.RPI : null;
 
         // ── Battery from BATTERY_STATUS.json ─────────────────────────────────
-        // voltages[] in mV; pick first valid cell (< 65535)
+        // Two possible shapes:
+        //   UDP/Zigbee path:  { voltage: V, current: A, percent: % }
+        //   MAVLink path:     { voltages: [mV...], current_battery: cA, battery_remaining: % }
         const rawVoltages: number[] = batt.voltages ?? [];
         const battMv = rawVoltages.find((v: number) => v > 0 && v < 65535) ?? 0;
-        const battV  = battMv / 1000.0;
+        const battV  = batt.voltage != null ? batt.voltage : battMv / 1000.0;
 
         // 4S LiPo curve: 12.0 V = 0 %, 16.8 V = 100 %
         const BATT_MIN_V = 12.0;
@@ -69,9 +71,19 @@ export default function App() {
         const voltToPct = (v: number) =>
           Math.min(100, Math.max(0, Math.round(((v - BATT_MIN_V) / (BATT_MAX_V - BATT_MIN_V)) * 100)));
 
-        const battA = (batt.current_battery != null && batt.current_battery !== -1)
-          ? batt.current_battery / 100.0
-          : 0;
+        let battA: number;
+        if (batt.current != null) {
+          battA = batt.current;
+        } else if (batt.current_battery != null && batt.current_battery !== -1) {
+          battA = batt.current_battery / 100.0;
+        } else {
+          battA = 0;
+        }
+
+        const battPctFromJson: number | null =
+          batt.percent != null ? batt.percent
+          : (batt.battery_remaining != null && batt.battery_remaining !== -1) ? batt.battery_remaining
+          : null;
 
         let battery: { percent: number; voltage: number; current: number };
         if (rpi && rpi.battery != null) {
@@ -81,7 +93,8 @@ export default function App() {
           const rCurr  = typeof rBatt === "object" ? (rBatt?.current ?? battA) : battA;
           battery = { percent: voltToPct(rVolt), voltage: rVolt, current: rCurr };
         } else {
-          battery = { percent: voltToPct(battV), voltage: battV, current: battA };
+          const pct = battPctFromJson != null ? battPctFromJson : voltToPct(battV);
+          battery = { percent: pct, voltage: battV, current: battA };
         }
 
         // ── Attitude from ATTITUDE.json (radians) ─────────────────────────────

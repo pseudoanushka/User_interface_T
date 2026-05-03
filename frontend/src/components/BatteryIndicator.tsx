@@ -28,13 +28,13 @@ export const BatteryIndicator: React.FC<BatteryIndicatorProps> = ({ batteryPerce
                 className="ah-battery-icon"
                 style={{
                     borderColor: barColor,
-                    borderWidth: '3px',
-                    boxShadow: `0 0 20px ${glowOuter}, inset 0 0 20px ${glowInner}`,
+                    borderWidth: '2px',
+                    boxShadow: `0 0 16px ${glowOuter}, inset 0 0 14px ${glowInner}`,
                     backgroundColor: 'rgba(2,6,23,0.5)',
                     backdropFilter: 'blur(4px)',
                 }}
             >
-                <div className="ah-battery-cap" style={{ backgroundColor: barColor, boxShadow: `0 -2px 8px ${capGlow}` }} />
+                <div className="ah-battery-cap" style={{ backgroundColor: barColor, boxShadow: `0 -1px 6px ${capGlow}` }} />
                 {/* Segment 1 – top, fills last (>75%) */}
                 <div className="ah-battery-segment" style={{ backgroundColor: filled(75), borderColor: barColor }} />
                 {/* Segment 2 – fills at >50% */}
@@ -44,7 +44,7 @@ export const BatteryIndicator: React.FC<BatteryIndicatorProps> = ({ batteryPerce
                 {/* Segment 4 – bottom, fills first (>0%) */}
                 <div className="ah-battery-segment" style={{ backgroundColor: filled(0),  borderColor: barColor }} />
             </div>
-            <div className="ah-battery-text" style={{ fontSize: '1.2rem', marginTop: '4px', textAlign: 'center' }}>
+            <div className="ah-battery-text" style={{ fontSize: '0.68rem', marginTop: '4px', textAlign: 'center' }}>
                 <div>{pct.toFixed(0)}%{isDanger ? ' ⚠' : ''}</div>
                 <div>{batteryV  != null ? Number(batteryV).toFixed(1)  : '0.0'} V</div>
                 <div>{batteryA  != null ? Number(batteryA).toFixed(1)  : '0.0'} A</div>

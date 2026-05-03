@@ -81,6 +81,7 @@ export default function CockpitDashboard({ data, socket: _socket }: { data: Tele
               pitch={data.attitude.pitch}
               roll={data.attitude.roll}
               yaw={data.attitude.yaw}
+              z={data.position.z}
               dronePhase={dronePhase}
             >
               {/* Embedded Widgets for Four-Corner Layout */}
@@ -108,11 +109,11 @@ export default function CockpitDashboard({ data, socket: _socket }: { data: Tele
         </div>
 
         {/* Bottom Telemetry Strip */}
-        <div className="panel" style={{ margin: '0 12px 12px 12px', flex: '0 0 auto' }}>
+        <div className="panel" style={{ margin: '0 8px 8px', flex: '0 0 auto' }}>
           <TelemetryPanel data={data} />
         </div>
       </div>
     </>
   );
 }
-
+

@@ -141,13 +141,13 @@ export const VelocityVectors: React.FC<VelocityVectorsProps> = ({
                     }}>
                         {/* Arrowhead */}
                         <svg
-                            width="30"
-                            height="30"
+                            width="18"
+                            height="18"
                             viewBox="0 0 24 24"
                             fill="#991b1b"
                             style={{
                                 position: 'absolute',
-                                right: '-9px',
+                                right: '-7px',
                                 top: '50%',
                                 transform: 'translateY(-50%)',
                                 transition: 'opacity 80ms ease-out',
@@ -164,13 +164,21 @@ export const VelocityVectors: React.FC<VelocityVectorsProps> = ({
             <div style={{
                 marginTop: '8px',
                 color: '#22d3ee',
-                fontSize: '1.05rem',
+                fontSize: '1rem',
                 fontWeight: 'bold',
                 textShadow: '0 0 8px rgba(34,211,238,0.8)',
                 textAlign: 'center',
-                lineHeight: '1.4',
+                lineHeight: '1.25',
             }}>
                 <div>{position === 'left' ? 'Vv' : 'Vh'}</div>
+                {position === 'left' ? (
+                    <div className="ah-vv-readout">{vz.toFixed(2)} m/s</div>
+                ) : (
+                    <div className="ah-vv-readout">
+                        <div>Vx {vx.toFixed(2)}</div>
+                        <div>Vy {vy.toFixed(2)}</div>
+                    </div>
+                )}
             </div>
         </div>
     );
