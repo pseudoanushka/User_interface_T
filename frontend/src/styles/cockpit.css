@@ -43,8 +43,8 @@ body {
 /* =============================== MAIN GRID =============================== */
 
 .cockpit-container {
-  width: calc(100vw / 6);
-  max-width: calc(100vw / 6);
+  width: calc(200vw / 6);
+  max-width: calc(200vw / 6);
   height: 100vh;
   margin: 0;
   border: none;
