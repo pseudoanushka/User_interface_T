@@ -17,6 +17,9 @@ interface TelemetryData {
   attitude: { pitch: number; roll: number; yaw: number };
   battery: { percent: number; voltage: number; current: number } | number;
   temperature: number;
+  distance: number;
+  rpi_temp: number;
+  imu_temp: number;
   linkQuality: number;
   storage: number;
   cpuLoad: number;

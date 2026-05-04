@@ -340,6 +340,16 @@ canvas {
   margin-left: 0.5rem;
 }
 
+.tpanel-val-cyan {
+  color: #22d3ee;
+  margin-left: 0.5rem;
+}
+
+.tpanel-val-orange {
+  color: #fb923c;
+  margin-left: 0.5rem;
+}
+
 .tpanel-system-section {
   padding-top: 0.5rem;
   border-top: 1px solid #334155;

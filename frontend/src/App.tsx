@@ -16,6 +16,9 @@ const defaultData = {
   attitude: { pitch: 0, roll: 0, yaw: 0 },
   battery: { percent: 0, voltage: 0, current: 0 },
   temperature: 0,
+  distance: 0,
+  rpi_temp: 0,
+  imu_temp: 0,
   linkQuality: 0,
   storage: 0,
   cpuLoad: 0,
@@ -53,6 +56,7 @@ export default function App() {
         const pos     = params.LOCAL_POSITION_NED ?? {};
         const hb      = params.HEARTBEAT          ?? {};
         const ard_raw = params.BASE_STATION_DATA  ?? {};
+        const dist    = params.DISTANCE_SENSOR    ?? {};
 
         // ── RPi source (Pixhawk → RPi → GCS) ─────────────────────────────────
         const rpi = tel.RPI && Object.keys(tel.RPI).length > 0 ? tel.RPI : null;
@@ -143,10 +147,13 @@ export default function App() {
           },
           attitude: { pitch: pitchDeg, roll: rollDeg, yaw: yawDeg },
           battery,
+          distance:     dist.distance     ?? 0,
+          rpi_temp:     dist.rpi_temp     ?? 0,
+          imu_temp:     dist.imu_temp     ?? 45,
           armed:        isArmed,
           connected:    rpi ? (rpi.connected    ?? false) : false,
           rc_available: rpi ? (rpi.rc_available  ?? true)  : true,
-          temperature:  tel.ZIGBEE?.temperature  ?? 45,
+          temperature:  dist.imu_temp ?? tel.ZIGBEE?.temperature ?? 45,
           linkQuality:  tel.ZIGBEE?.linkQuality   ?? 95,
           storage:      tel.ZIGBEE?.storage       ?? 50,
           cpuLoad:      tel.ZIGBEE?.cpuLoad       ?? 20,

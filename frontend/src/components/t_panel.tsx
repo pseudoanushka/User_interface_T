@@ -7,6 +7,9 @@ interface TelemetryData {
   attitude: { pitch: number; roll: number; yaw: number };
   battery: { percent: number; voltage: number; current: number } | number;
   temperature: number;
+  distance: number;
+  rpi_temp: number;
+  imu_temp: number;
   linkQuality: number;
   storage: number;
   cpuLoad: number;
@@ -75,6 +78,25 @@ export function TelemetryPanel({ data }: TelemetryPanelProps) {
           <div>
             <span className="tpanel-label">Yaw:</span>
             <span className="tpanel-val-purple">{data.attitude.yaw.toFixed(1)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Distance & Sensors */}
+      <div className="tpanel-section">
+        <div className="tpanel-section-title">SENSORS</div>
+        <div className="tpanel-grid">
+          <div>
+            <span className="tpanel-label">Distance:</span>
+            <span className="tpanel-val-cyan">{data.distance.toFixed(2)} m</span>
+          </div>
+          <div>
+            <span className="tpanel-label">RPi Temp:</span>
+            <span className="tpanel-val-orange">{data.rpi_temp.toFixed(1)}°C</span>
+          </div>
+          <div>
+            <span className="tpanel-label">IMU Temp:</span>
+            <span className="tpanel-val-orange">{data.imu_temp.toFixed(1)}°C</span>
           </div>
         </div>
       </div>
