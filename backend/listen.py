@@ -446,11 +446,20 @@ def process_telem_packet(code: str, values: list, source: str) -> None:
     if source != active:
         return
 
+    expected_lengths = {"A": 9, "B": 3, "D": 3}
+    expected_len = expected_lengths.get(code)
+    if expected_len is None:
+        print(f"[TELEM] Dropped unknown packet code from {source}: {code!r}")
+        return
+    if len(values) != expected_len:
+        print(f"[TELEM] Dropped {source} packet {code}: expected {expected_len} values, got {len(values)}")
+        return
+
     with _telem_state_lock:
         _telem_state["source"] = source
         _telem_state["last_update"] = time.time()
 
-        if code == "A" and len(values) == 9:
+        if code == "A":
             _telem_state["attitude"] = {
                 "roll": math.radians(values[0]),
                 "pitch": math.radians(values[1]),
@@ -461,14 +470,14 @@ def process_telem_packet(code: str, values: list, source: str) -> None:
                 "vx": values[6], "vy": values[7], "vz": values[8],
             }
 
-        elif code == "B" and len(values) == 3:
+        elif code == "B":
             _telem_state["battery"] = {
                 "voltage": _safe_float(values[0]),
                 "current": _safe_float(values[2]),
                 "percent": int(_safe_float(values[1]))
             }
 
-        elif code == "D" and len(values) == 3:
+        elif code == "D":
             _telem_state["distance"] = {
                 "distance": _safe_float(values[0]),
                 "rpi_temp": round(_safe_float(values[1]), 1),
@@ -511,6 +520,7 @@ def _ensure_udp_fallback_running() -> None:
     import udp_telem_reciever
     threading.Thread(
         target=udp_telem_reciever.run_udp_only,
+        args=(process_telem_packet,),
         daemon=True,
         name="udp-telem-fallback",
     ).start()

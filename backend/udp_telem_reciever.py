@@ -144,13 +144,15 @@ def _display_loop() -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # ENTRY POINT  (called by listen._ensure_udp_fallback_running)
 # ─────────────────────────────────────────────────────────────────────────────
-def run_udp_only() -> None:
+def run_udp_only(process_packet=None) -> None:
     """
     Blocking UDP receiver.
     Forwards parsed packets to listen.process_telem_packet(); listen.py owns
     the source gate and is the only writer of telemetry JSON files.
     """
-    import listen   # late import — listen is already loaded when this runs
+    if process_packet is None:
+        import listen
+        process_packet = listen.process_telem_packet
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(1.0)
@@ -170,7 +172,9 @@ def run_udp_only() -> None:
             if code in CODES:
                 hz = _update_code_freq(code, t)
                 _update_display_state(code, values, hz)
-                listen.process_telem_packet(code, values, "udp")
+                process_packet(code, values, "udp")
+            elif text:
+                log.warning(f"[UDP] Dropped malformed packet: {text!r}")
         except socket.timeout:
             pass   # no packet — keep looping
         except Exception as e:

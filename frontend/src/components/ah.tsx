@@ -4,11 +4,12 @@ interface ArtificialHorizonProps {
   pitch: number;
   roll: number;
   yaw: number;
+  z?: number;
   dronePhase?: string;
   children?: React.ReactNode;
 }
 
-export function ArtificialHorizon({ pitch, roll, yaw, dronePhase = 'STANDBY', children }: ArtificialHorizonProps) {
+export function ArtificialHorizon({ pitch, roll, yaw, z = 0, dronePhase = 'STANDBY', children }: ArtificialHorizonProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -71,7 +72,7 @@ export function ArtificialHorizon({ pitch, roll, yaw, dronePhase = 'STANDBY', ch
     // Pitch ladder
     ctx.strokeStyle = '#f1eeeeff';
     ctx.lineWidth = Math.max(1, radius * 0.005);
-    const pitchFontSize = Math.max(12, radius * 0.12);
+    const pitchFontSize = Math.max(24, radius * 0.2);
     ctx.font = `${pitchFontSize}px monospace`;
     ctx.fillStyle = '#ffffff';
     ctx.textAlign = 'right';
@@ -175,7 +176,7 @@ export function ArtificialHorizon({ pitch, roll, yaw, dronePhase = 'STANDBY', ch
       // Only draw text for major roll marks to avoid clutter
       if (Math.abs(mark) % 30 === 0 || (Math.abs(mark) % 15 === 0 && Math.abs(mark) >= 45)) {
         ctx.save();
-        const rollFontSize = Math.max(10, radius * 0.06);
+        const rollFontSize = Math.max(18, radius * 0.12);
         ctx.font = `${rollFontSize}px monospace`;
         ctx.fillStyle = '#000000'; // Change color of angle measurements to black
         ctx.textAlign = 'center';
@@ -233,6 +234,21 @@ export function ArtificialHorizon({ pitch, roll, yaw, dronePhase = 'STANDBY', ch
 
       </div>
 
+      <div className="ah-z-tape" aria-label="Z height reference">
+        <div className="ah-z-tape-track">
+          {[-2, -1, 0, 1, 2].map((offset) => {
+            const value = z + offset;
+            return (
+              <div className={`ah-z-tick${offset === 0 ? ' active' : ''}`} key={offset}>
+                <span className="ah-z-mark" />
+                <span className="ah-z-value">{value.toFixed(1)}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="ah-z-pointer">Z {z.toFixed(2)}</div>
+      </div>
+
       {/* Wrapper for Canvas and Absolute Overlay */}
       <div className="ah-wrapper">
         <canvas
@@ -240,7 +256,7 @@ export function ArtificialHorizon({ pitch, roll, yaw, dronePhase = 'STANDBY', ch
           width={1500}
           height={1500}
           className="ah-canvas"
-          style={{ width: '100%', maxWidth: '550px', height: 'auto', aspectRatio: '1/1', borderRadius: '50%' }}
+          style={{ width: '185px', maxWidth: '185px', height: 'auto', aspectRatio: '1/1', borderRadius: '50%' }}
         />
 
         {/* INTERNAL OVERLAY ADDITION */}
@@ -253,21 +269,21 @@ export function ArtificialHorizon({ pitch, roll, yaw, dronePhase = 'STANDBY', ch
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '12px',
-        padding: '10px 28px',
+        gap: '7px',
+        padding: '7px 18px',
         background: 'rgba(2,6,23,0.85)',
         border: `1px solid ${col}44`,
         borderRadius: '4px',
         boxShadow: isActive ? `0 0 14px ${col}33` : 'none',
         transition: 'all 0.4s ease',
-        maxWidth: '420px',
-        margin: '22px auto 0',
+        maxWidth: '185px',
+        margin: '14px auto 0',
       }}>
         {/* Blinking indicator dot */}
         <span style={{
           display: 'inline-block',
-          width: '11px',
-          height: '11px',
+          width: '7px',
+          height: '7px',
           borderRadius: '50%',
           background: col,
           flexShrink: 0,
@@ -276,9 +292,9 @@ export function ArtificialHorizon({ pitch, roll, yaw, dronePhase = 'STANDBY', ch
         }} />
         <span style={{
           fontFamily: "'Rajdhani', monospace",
-          fontSize: '22px',
+          fontSize: '14px',
           fontWeight: 700,
-          letterSpacing: '4px',
+          letterSpacing: '2px',
           color: col,
           textTransform: 'uppercase',
         }}>{dronePhase}</span>
